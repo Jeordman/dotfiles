@@ -144,6 +144,25 @@ stow nvim tmux zsh ghostty
    p10k configure
    ```
 
+## Submodules
+
+Nvim config is a submodule → [kickstart.nvim](https://github.com/Jeordman/kickstart.nvim)
+
+**Update submodules**:
+```bash
+git submodule update --remote
+```
+
+**Work on nvim config**:
+```bash
+cd nvim/.config/nvim
+git checkout main
+# make changes...
+git add . && git commit -m "msg" && git push
+cd ~/dotfiles
+git add nvim/.config/nvim && git commit -m "Update nvim"
+```
+
 ## Uninstalling
 
 To remove dotfile symlinks:
