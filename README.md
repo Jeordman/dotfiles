@@ -148,9 +148,9 @@ stow nvim tmux zsh ghostty
 
 Nvim config is a submodule → [kickstart.nvim](https://github.com/Jeordman/kickstart.nvim)
 
-**Update submodules**:
+**Initialize/update submodules** (if you cloned without `--recurse-submodules`):
 ```bash
-git submodule update --remote
+git submodule update --init --recursive
 ```
 
 **Work on nvim config**:

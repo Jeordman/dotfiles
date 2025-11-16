@@ -11,6 +11,31 @@ ensure_package "zsh" "zsh" "Zsh"
 # Tmux
 ensure_package "tmux" "tmux" "Tmux"
 
+# Ghostty terminal
+if [[ "$OS_TYPE" == "macos" ]]; then
+    ensure_package "ghostty" "ghostty" "Ghostty"
+else
+    # Ghostty installation varies by distro
+    if ! command -v ghostty &> /dev/null; then
+        case "$PACKAGE_MANAGER" in
+            apt)
+                log_warning "Ghostty not available in apt repos"
+                log_info "Install from: https://github.com/ghostty-org/ghostty"
+                ;;
+            dnf|pacman)
+                log_warning "Ghostty installation may require manual setup"
+                log_info "Install from: https://github.com/ghostty-org/ghostty"
+                ;;
+            *)
+                log_warning "Ghostty installation not automated for this package manager"
+                log_info "Install from: https://github.com/ghostty-org/ghostty"
+                ;;
+        esac
+    else
+        log_success "Ghostty already installed"
+    fi
+fi
+
 # Modern CLI tools
 log_info "Installing modern CLI tools..."
 
