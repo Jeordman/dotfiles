@@ -1,0 +1,14 @@
+# Set background transparency (0.0 = fully transparent, 1.0 = opaque)
+background-opacity = 0.85
+
+# Enable blur behind the terminal
+background-blur = true
+
+# Optional: adjust the amount of blur if Ghostty supports it
+background-blur-radius = 10
+
+font-size = 16
+font-family = "Hack Nerd Font"
+
+title = " " 
+
