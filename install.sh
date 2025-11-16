@@ -113,6 +113,12 @@ run_interactive_installation() {
         run_module "03-terminal.sh"
     fi
 
+    if [[ "$OS_TYPE" == "macos" ]]; then
+        if ask_yes_no "Configure macOS keyboard settings?"; then
+            run_module "04-macos.sh"
+        fi
+    fi
+
     if ask_yes_no "Link dotfiles using GNU Stow?"; then
         run_module "05-dotfiles.sh"
     fi
@@ -139,6 +145,9 @@ main() {
         run_module "01-system.sh"
         run_module "02-development.sh"
         run_module "03-terminal.sh"
+        if [[ "$OS_TYPE" == "macos" ]]; then
+            run_module "04-macos.sh"
+        fi
         run_module "05-dotfiles.sh"
 
     elif [[ "$MODE" == "minimal" ]]; then

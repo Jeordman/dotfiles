@@ -8,7 +8,7 @@ Personal development environment configuration with automated installation.
 
 ```bash
 cd ~
-git clone --recurse-submodules <your-dotfiles-repo-url> dotfiles
+git clone <your-dotfiles-repo-url> dotfiles
 cd dotfiles
 ```
 
@@ -143,25 +143,6 @@ stow nvim tmux zsh ghostty
    ```bash
    p10k configure
    ```
-
-## Submodules
-
-Nvim config is a submodule → [kickstart.nvim](https://github.com/Jeordman/kickstart.nvim)
-
-**Initialize/update submodules** (if you cloned without `--recurse-submodules`):
-```bash
-git submodule update --init --recursive
-```
-
-**Work on nvim config**:
-```bash
-cd nvim/.config/nvim
-git checkout main
-# make changes...
-git add . && git commit -m "msg" && git push
-cd ~/dotfiles
-git add nvim/.config/nvim && git commit -m "Update nvim"
-```
 
 ## Uninstalling
 
