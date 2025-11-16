@@ -17,8 +17,8 @@ set -euo pipefail
 
 # Script directory
 readonly DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly LIB_DIR="$DOTFILES_DIR/lib"
-readonly MODULES_DIR="$DOTFILES_DIR/modules"
+readonly LIB_DIR="$DOTFILES_DIR/install/lib"
+readonly MODULES_DIR="$DOTFILES_DIR/install/modules"
 
 # Export for use in modules
 export DOTFILES_DIR
