@@ -219,6 +219,7 @@ return {
         --    https://github.com/pmizio/typescript-tools.nvim
         --
         -- But for many setups, the LSP (`ts_ls`) will work just fine
+        bashls = {},
         ts_ls = {
           -- Only try to load Next.js plugin if it exists
           init_options = {
