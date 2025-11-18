@@ -110,6 +110,16 @@ end, { desc = 'Change CWD to current file directory' })
 -- Keymap for the new command
 vim.keymap.set('n', '<leader>cd', ':ChangeRoot<CR>', { desc = 'Change [C]WD to Git [D]irectory root' })
 
+-- Delete all buffers
+vim.api.nvim_create_user_command('Bda', function()
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].buflisted then
+      vim.api.nvim_buf_delete(buf, { force = false })
+    end
+  end
+end, { desc = 'Delete all buffers' })
+vim.cmd('cnoreabbrev bda Bda')
+
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
 local lazypath = vim.fn.stdpath 'data' .. '/lazy/lazy.nvim'
