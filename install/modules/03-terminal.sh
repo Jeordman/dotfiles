@@ -84,6 +84,54 @@ fi
 # thefuck (command correction tool)
 ensure_package "thefuck" "thefuck" "thefuck"
 
+# File manager and media tools
+log_info "Installing file manager tools..."
+
+# Yazi file manager
+ensure_package "yazi" "yazi" "yazi"
+
+# Yazi dependencies for media preview support
+ensure_package "ffmpeg" "ffmpeg" "FFmpeg"
+
+# 7-Zip (package name varies by OS)
+if [[ "$OS_TYPE" == "macos" ]]; then
+    ensure_package "7z" "p7zip" "7-Zip"
+else
+    ensure_package "7z" "p7zip-full" "7-Zip"
+fi
+
+ensure_package "pdftoppm" "poppler" "Poppler"
+ensure_package "magick" "imagemagick" "ImageMagick"
+
+# resvg for SVG rendering (may need cargo on some systems)
+if [[ "$OS_TYPE" == "macos" ]]; then
+    ensure_package "resvg" "resvg" "resvg"
+else
+    if ! command -v resvg &> /dev/null; then
+        if command -v cargo &> /dev/null; then
+            log_info "Installing resvg via cargo..."
+            cargo install resvg
+            log_success "resvg installed"
+        else
+            log_warning "resvg requires cargo - skipping"
+            log_info "Install rust/cargo first or install resvg manually"
+        fi
+    else
+        log_success "resvg already installed"
+    fi
+fi
+
+# Nerd Font for icons (macOS only - Linux users should install manually)
+if [[ "$OS_TYPE" == "macos" ]]; then
+    if ! brew list --cask font-symbols-only-nerd-font &> /dev/null; then
+        log_info "Installing Symbols Nerd Font..."
+        brew install --cask font-symbols-only-nerd-font
+        log_success "Symbols Nerd Font installed"
+    else
+        log_success "Symbols Nerd Font already installed"
+    fi
+fi
+
 # Node Version Manager (NVM)
 log_info "Setting up NVM (Node Version Manager)..."
 if [ ! -d "$HOME/.nvm" ]; then
