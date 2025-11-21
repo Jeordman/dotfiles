@@ -26,6 +26,7 @@ return { -- Highlight, edit, and navigate code
       'php',        -- PHP files
       'phpdoc',     -- PHPDoc comments
       'sql',        -- SQL
+      'toml',       -- TOML configuration files
     },
     -- Autoinstall languages that are not installed
     auto_install = true,

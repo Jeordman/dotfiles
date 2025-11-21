@@ -243,6 +243,7 @@ return {
             workingDirectories = { mode = 'auto' },
           },
         },
+        taplo = {}, -- TOML LSP
 
         lua_ls = {
           -- cmd = { ... },

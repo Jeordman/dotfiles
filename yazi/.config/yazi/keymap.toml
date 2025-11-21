@@ -1,0 +1,10 @@
+[mgr]
+prepend_keymap = [
+  { on = "<C-d>", run = "seek 5", desc = "Seek preview down" },
+  { on = "<C-u>", run = "seek -5", desc = "Seek preview up" },
+
+  { on  = ["g", "h"], run = "cd ~", desc = "Go to Home" },
+  { on  = ["g", "u"], run = "cd ~/unicity", desc = "Go to Unicity" },
+  { on  = ["g", "c"], run = "cd ~/dotfiles/nvim/.config/nvim/", desc = "Go to Nvim Config" },
+  { on  = ["g", "d"], run = "cd ~/dotfiles/", desc = "Go to Dotfiles" },
+]
