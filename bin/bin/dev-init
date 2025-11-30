@@ -1,0 +1,101 @@
+#!/bin/bash
+set -euo pipefail
+
+# dev-init - Initialize a tmux workflow with Claude, Neovim, and dev server
+# Usage: dev-init [-d DIRECTORY]
+#   -d DIRECTORY     Working directory (default: current directory)
+#
+# Session name is automatically derived from the directory name
+
+WORK_DIR="$(pwd)"
+IN_TMUX=false
+
+# Check if we're in a tmux session
+if [ -n "${TMUX:-}" ]; then
+  IN_TMUX=true
+fi
+
+# Parse arguments
+while getopts "d:" opt; do
+  case $opt in
+    d) WORK_DIR="$OPTARG" ;;
+    *) echo "Usage: $0 [-d DIRECTORY]"; exit 1 ;;
+  esac
+done
+
+# Try to find the directory
+if [ ! -d "$WORK_DIR" ]; then
+  # If not found, try ~/unicity/ as fallback
+  FALLBACK_DIR="$HOME/unicity/$WORK_DIR"
+  if [ -d "$FALLBACK_DIR" ]; then
+    WORK_DIR="$FALLBACK_DIR"
+  else
+    echo "Error: Directory not found in current directory or ~/unicity/"
+    echo "Looked in: $WORK_DIR and $FALLBACK_DIR"
+    exit 1
+  fi
+fi
+
+# Convert to absolute path
+WORK_DIR="$(cd "$WORK_DIR" && pwd)"
+
+# Auto-derive session name from directory name
+SESSION_NAME="$(basename "$WORK_DIR")"
+
+# Check if session already exists
+if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
+  echo "Error: Session '$SESSION_NAME' already exists"
+  echo "Use: tmux kill-session -t $SESSION_NAME"
+  exit 1
+fi
+
+# Function to setup workflow windows
+setup_workflow() {
+  local session=$1
+  local server_window_name="shell"
+  local server_command=""
+
+  # Check if package.json exists
+  if [ -f "$WORK_DIR/package.json" ]; then
+    server_window_name="dev"
+    server_command="npm run dev"
+  fi
+
+  # Create window 1 (Neovim)
+  tmux new-window -t "$session" -n "neovim" -c "$WORK_DIR"
+
+  # Create window 2 (Dev server or shell)
+  tmux new-window -t "$session" -n "$server_window_name" -c "$WORK_DIR"
+
+  # Rename first window to claude
+  tmux rename-window -t "$session:0" "claude"
+
+  # Send commands to each window
+  echo "Starting Claude in window 0..."
+  tmux send-keys -t "$session:claude" "claude" Enter
+
+  echo "Starting Neovim in window 1..."
+  tmux send-keys -t "$session:neovim" "nvim ." Enter
+
+  if [ -n "$server_command" ]; then
+    echo "Starting dev server in window 2..."
+    tmux send-keys -t "$session:$server_window_name" "$server_command" Enter
+  else
+    echo "Created shell terminal window 2..."
+  fi
+}
+
+# Always create a new session
+echo "Creating new session: $SESSION_NAME"
+tmux new-session -d -s "$SESSION_NAME" -c "$WORK_DIR"
+
+setup_workflow "$SESSION_NAME"
+
+# Attach or switch depending on tmux state
+if [ "$IN_TMUX" = false ]; then
+  echo "Attaching to session..."
+  tmux attach-session -t "$SESSION_NAME"
+else
+  echo "Switching to session: $SESSION_NAME"
+  tmux switch-client -t "$SESSION_NAME"
+fi

@@ -113,5 +113,6 @@ alias uni='cd ~/unicity'
 alias docudocs="cd ~/unicity/docu-docs"
 alias newshop="cd ~/unicity/new-shop"
 alias ufeelgreat="cd ~/unicity/UFeelGreat/"
+alias dev-init='~/bin/dev-init'
 
 eval "$(thefuck --alias)"
