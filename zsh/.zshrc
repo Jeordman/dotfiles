@@ -115,4 +115,24 @@ alias newshop="cd ~/unicity/new-shop"
 alias ufeelgreat="cd ~/unicity/UFeelGreat/"
 alias dev-init='~/bin/dev-init'
 
+# Tmux attach with auto-create - if no sessions exist, create one
+tmux() {
+  # Check if the first argument is 'a' or 'attach' or 'attach-session'
+  if [[ "$1" == "a" || "$1" == "attach" || "$1" == "attach-session" ]]; then
+    # Check if there are any tmux sessions
+    if ! command tmux has-session 2>/dev/null; then
+      # No sessions exist, create a new default one
+      echo "No tmux sessions found. Creating new session..."
+      command tmux new-session -d -s main -c ~
+      command tmux attach-session -t main
+    else
+      # Session exists, proceed normally
+      command tmux "$@"
+    fi
+  else
+    # For all other tmux commands, pass through normally
+    command tmux "$@"
+  fi
+}
+
 eval "$(thefuck --alias)"
