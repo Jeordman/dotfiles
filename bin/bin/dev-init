@@ -2,13 +2,15 @@
 set -euo pipefail
 
 # dev-init - Initialize a tmux workflow with Claude, Neovim, and dev server
-# Usage: dev-init [-d DIRECTORY]
+# Usage: dev-init [-d DIRECTORY] [-s]
 #   -d DIRECTORY     Working directory (default: current directory)
+#   -s               Force shell (skip dev server even if package.json exists)
 #
 # Session name is automatically derived from the directory name
 
 WORK_DIR="$(pwd)"
 IN_TMUX=false
+FORCE_SHELL=false
 
 # Check if we're in a tmux session
 if [ -n "${TMUX:-}" ]; then
@@ -16,10 +18,11 @@ if [ -n "${TMUX:-}" ]; then
 fi
 
 # Parse arguments
-while getopts "d:" opt; do
+while getopts "d:s" opt; do
   case $opt in
     d) WORK_DIR="$OPTARG" ;;
-    *) echo "Usage: $0 [-d DIRECTORY]"; exit 1 ;;
+    s) FORCE_SHELL=true ;;
+    *) echo "Usage: $0 [-d DIRECTORY] [-s]"; exit 1 ;;
   esac
 done
 
@@ -55,8 +58,8 @@ setup_workflow() {
   local server_window_name="shell"
   local server_command=""
 
-  # Check if package.json exists
-  if [ -f "$WORK_DIR/package.json" ]; then
+  # Check if package.json exists and FORCE_SHELL is not set
+  if [ -f "$WORK_DIR/package.json" ] && [ "$FORCE_SHELL" = false ]; then
     server_window_name="dev"
     server_command="npm run dev"
   fi
