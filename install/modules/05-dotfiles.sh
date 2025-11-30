@@ -39,12 +39,12 @@ backup_if_exists "$HOME/.config/ghostty"
 log_info "Creating symlinks with GNU Stow..."
 
 if [[ "$DRY_RUN" == "true" ]]; then
-    log_info "[DRY RUN] Would run: stow -R -v nvim tmux zsh ghostty"
+    log_info "[DRY RUN] Would run: stow -R -v bin claude ghostty nvim tmux yazi zsh"
 else
     # Check which directories exist before stowing
     local stow_targets=()
 
-    for dir in nvim tmux zsh ghostty; do
+    for dir in bin claude ghostty nvim tmux yazi zsh; do
         if [ -d "$DOTFILES_DIR/$dir" ]; then
             stow_targets+=("$dir")
         else
