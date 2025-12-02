@@ -124,8 +124,8 @@ tmux() {
     if ! command tmux has-session 2>/dev/null; then
       # No sessions exist, create a new default one
       echo "No tmux sessions found. Creating new session..."
-      command tmux new-session -d -s main -c ~
-      command tmux attach-session -t main
+      command tmux new-session -d -s "THE SPIRE" -c ~
+      command tmux attach-session -t "THE SPIRE"
     else
       # Session exists, proceed normally
       command tmux "$@"
