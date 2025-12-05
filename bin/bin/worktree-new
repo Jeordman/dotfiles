@@ -106,7 +106,7 @@ fi
 
 # Initialize tmux session
 echo "Initializing tmux session..."
-dev-init -d "$WORKTREE_PATH" -s
+dev-init -d "$WORKTREE_PATH"
 
 echo ""
 echo "✓ Worktree created and tmux session initialized!"
