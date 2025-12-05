@@ -15,12 +15,6 @@ return {
       silent = true,
     },
     {
-      '<leader>gf',
-      ':diffget //3<CR>',
-      desc = 'Git diffget to resolve conflicts',
-      silent = true,
-    },
-    {
       '<leader>gp',
       ':Git push<cr>',
       desc = 'Git push',

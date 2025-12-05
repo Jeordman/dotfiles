@@ -37,7 +37,7 @@ require('lazy').setup({
   require 'plugins.misc.lazygit',
   require 'plugins.misc.neoscroll',
   require 'plugins.misc.flash',
-  require 'plugins.git.snacks',
+  require 'plugins.git.diffview',
 }, {
   ui = {
     -- If you are using a Nerd Font: set icons to an empty table which will use the

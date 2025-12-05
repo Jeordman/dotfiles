@@ -15,7 +15,7 @@ return {
   keys = {
     -- Select what to diff against
     {
-      '<leader>gsd',
+      '<leader>gf',
       function()
         vim.ui.select({ 'origin/staging', 'origin/master', 'index', 'HEAD' }, { prompt = 'Diff against:' },
           function(choice)
@@ -35,7 +35,7 @@ return {
             print('Diffing against ' .. choice)
           end)
       end,
-      desc = 'Choose diff base',
+      desc = 'Git Review file',
     },
 
     -- Navigation between hunks
