@@ -105,7 +105,7 @@ function y() {
 
 alias v='nvim'
 alias c='claude'
-alias multipull="find . -mindepth 1 -maxdepth 1 -type d -print -exec git -C {} pull \;"
+alias multipull="find . -mindepth 1 -maxdepth 1 -type d ! -name '.*' -print -exec git -C {} pull \;"
 # alias multimain='find . -mindepth 1 -maxdepth 1 -type d -print -exec sh -c '\''cd "$1" && (git checkout main 2>/dev/null || git checkout master)'\'' _ {} \;'
 # alias multi='multimain && multipull'
 alias multi='multipull'
