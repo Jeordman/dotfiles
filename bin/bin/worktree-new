@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+set -e
+
+# Usage: worktree-new <project> <base-branch> <type> <ticket> <description>
+# Example: worktree-new ClimbSmarter main feat ECOM-1234 checkout-flow
+
+if [ "$#" -ne 5 ]; then
+    echo "Usage: worktree-new <project> <base-branch> <type> <ticket> <description>"
+    echo "Example: worktree-new ClimbSmarter main feat ECOM-1234 checkout-flow"
+    exit 1
+fi
+
+PROJECT="$1"
+BASE_BRANCH="$2"
+TYPE="$3"
+TICKET="$4"
+DESCRIPTION="$5"
+
+# Validate ticket format (WORD-XXXX)
+if ! [[ "$TICKET" =~ ^[A-Z]+-[0-9]+$ ]]; then
+    echo "Error: Ticket must be in format WORD-XXXX (e.g., ECOM-1234)"
+    exit 1
+fi
+
+# Validate description (kebab-case)
+if ! [[ "$DESCRIPTION" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+    echo "Error: Description must be kebab-case (e.g., checkout-flow)"
+    exit 1
+fi
+
+# Validate project directory
+if [ ! -d "$PROJECT" ]; then
+    echo "Error: Project directory '$PROJECT' does not exist"
+    exit 1
+fi
+
+cd "$PROJECT"
+
+# Validate git repo
+if ! git rev-parse --git-dir > /dev/null 2>&1; then
+    echo "Error: '$PROJECT' is not a git repository"
+    exit 1
+fi
+
+# Check for clean working directory
+if ! git diff-index --quiet HEAD --; then
+    echo "Error: Working directory is not clean. Commit or stash changes first."
+    git status --short
+    exit 1
+fi
+
+BRANCH_NAME="$TYPE/$TICKET-$DESCRIPTION"
+WORKTREE_NAME="$PROJECT-$TYPE-$TICKET-$DESCRIPTION"
+WORKTREE_PATH="../$WORKTREE_NAME"
+
+# Determine the base branch reference (local or remote)
+BASE_REF=""
+if git show-ref --verify --quiet "refs/heads/$BASE_BRANCH"; then
+    BASE_REF="$BASE_BRANCH"
+    echo "Using local base branch '$BASE_BRANCH'"
+elif git show-ref --verify --quiet "refs/remotes/origin/$BASE_BRANCH"; then
+    BASE_REF="origin/$BASE_BRANCH"
+    echo "Using remote base branch 'origin/$BASE_BRANCH'"
+else
+    echo "Error: Base branch '$BASE_BRANCH' does not exist locally or remotely"
+    exit 1
+fi
+
+echo "Creating worktree for new branch..."
+echo "  Branch: $BRANCH_NAME"
+echo "  Base: $BASE_REF"
+echo "  Worktree: $WORKTREE_PATH"
+echo ""
+
+# Check if branch already exists
+if git show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
+    echo "Branch '$BRANCH_NAME' already exists, using it"
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+else
+    echo "Creating branch '$BRANCH_NAME' from '$BASE_REF'..."
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    git checkout -b "$BRANCH_NAME" "$BASE_REF"
+fi
+
+# Return to original branch
+if [ "$CURRENT_BRANCH" != "$BRANCH_NAME" ]; then
+    git checkout "$CURRENT_BRANCH"
+fi
+
+# Check if worktree already exists
+if [ -d "$WORKTREE_PATH" ]; then
+    echo "Error: Worktree already exists at '$WORKTREE_PATH'"
+    echo "Remove it first or choose a different name"
+    exit 1
+fi
+
+# Create worktree
+echo "Creating worktree..."
+git worktree add "$WORKTREE_PATH" "$BRANCH_NAME"
+
+# Copy env files if they exist
+if ls .env* 1> /dev/null 2>&1; then
+    echo "Copying .env files..."
+    cp .env* "$WORKTREE_PATH/" 2>/dev/null || true
+fi
+
+# Initialize tmux session
+echo "Initializing tmux session..."
+dev-init -d "$WORKTREE_PATH" -s
+
+echo ""
+echo "✓ Worktree created and tmux session initialized!"

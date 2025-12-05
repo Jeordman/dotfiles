@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+set -e
+
+# Usage: worktree-remove <worktree-path-or-name> [--force]
+# Example: worktree-remove ../new-shop-fix-ECOM-4342-test
+# Example: worktree-remove new-shop-fix-ECOM-4342-test
+# Example: worktree-remove ../new-shop-fix-ECOM-4342-test --force
+
+if [ "$#" -lt 1 ]; then
+    echo "Usage: worktree-remove <worktree-path-or-name> [--force]"
+    echo "Example: worktree-remove ../new-shop-fix-ECOM-4342-test"
+    echo "Example: worktree-remove new-shop-fix-ECOM-4342-test"
+    echo ""
+    echo "Options:"
+    echo "  --force    Skip safety checks (uncommitted changes, unpushed commits)"
+    exit 1
+fi
+
+WORKTREE_INPUT="$1"
+FORCE=false
+
+# Check for --force flag
+if [ "$#" -eq 2 ] && [ "$2" == "--force" ]; then
+    FORCE=true
+fi
+
+# Normalize worktree path - check multiple possible locations
+if [[ "$WORKTREE_INPUT" == ../* ]] || [[ "$WORKTREE_INPUT" == /* ]]; then
+    WORKTREE_PATH="$WORKTREE_INPUT"
+elif [ -d "$WORKTREE_INPUT" ]; then
+    # Worktree is in current directory
+    WORKTREE_PATH="$WORKTREE_INPUT"
+elif [ -d "../$WORKTREE_INPUT" ]; then
+    # Worktree is in parent directory
+    WORKTREE_PATH="../$WORKTREE_INPUT"
+else
+    echo "Error: Worktree '$WORKTREE_INPUT' not found"
+    echo "Checked:"
+    echo "  - $WORKTREE_INPUT"
+    echo "  - ../$WORKTREE_INPUT"
+    exit 1
+fi
+
+# Get the worktree name for tmux session
+WORKTREE_NAME=$(basename "$WORKTREE_PATH")
+
+echo "Removing worktree: $WORKTREE_PATH"
+echo ""
+
+# Save current directory
+ORIGINAL_DIR=$(pwd)
+
+# Change to worktree directory to check git status
+cd "$WORKTREE_PATH"
+
+# Validate it's a git repo
+if ! git rev-parse --git-dir > /dev/null 2>&1; then
+    echo "Error: '$WORKTREE_PATH' is not a git repository"
+    cd "$ORIGINAL_DIR"
+    exit 1
+fi
+
+if [ "$FORCE" = false ]; then
+    # Check for uncommitted changes
+    if ! git diff-index --quiet HEAD --; then
+        echo "Error: Worktree has uncommitted changes. Commit or stash them first."
+        echo ""
+        git status --short
+        echo ""
+        echo "Use --force to remove anyway"
+        cd "$ORIGINAL_DIR"
+        exit 1
+    fi
+
+    # Check for unpushed commits
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    UPSTREAM_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo "")
+
+    if [ -n "$UPSTREAM_BRANCH" ]; then
+        UNPUSHED=$(git log "$UPSTREAM_BRANCH..$CURRENT_BRANCH" --oneline 2>/dev/null || echo "")
+        if [ -n "$UNPUSHED" ]; then
+            echo "Error: Worktree has unpushed commits:"
+            echo ""
+            git log "$UPSTREAM_BRANCH..$CURRENT_BRANCH" --oneline
+            echo ""
+            echo "Push your changes or use --force to remove anyway"
+            cd "$ORIGINAL_DIR"
+            exit 1
+        fi
+    else
+        echo "Warning: No upstream branch set, cannot verify if commits are pushed"
+        echo "Branch: $CURRENT_BRANCH"
+        echo ""
+        read -p "Continue anyway? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            cd "$ORIGINAL_DIR"
+            exit 1
+        fi
+    fi
+fi
+
+# Get the main git repository path
+MAIN_REPO=$(git rev-parse --git-common-dir)
+MAIN_REPO=$(cd "$MAIN_REPO/.." && pwd)
+
+# Return to original directory
+cd "$ORIGINAL_DIR"
+
+echo "Safety checks passed. Removing worktree..."
+echo ""
+
+# Kill tmux session if it exists
+if tmux has-session -t "$WORKTREE_NAME" 2>/dev/null; then
+    echo "Killing tmux session '$WORKTREE_NAME'..."
+    tmux kill-session -t "$WORKTREE_NAME"
+else
+    echo "No tmux session found for '$WORKTREE_NAME'"
+fi
+
+# Remove worktree (must be run from main repo)
+echo "Removing worktree '$WORKTREE_PATH'..."
+cd "$MAIN_REPO"
+git worktree remove "$WORKTREE_PATH"
+cd "$ORIGINAL_DIR"
+
+echo ""
+echo "✓ Worktree removed successfully!"
+echo ""
+echo "Note: The branch '$CURRENT_BRANCH' still exists locally."
+echo "To delete it, run: git branch -d $CURRENT_BRANCH"
