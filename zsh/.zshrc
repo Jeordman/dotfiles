@@ -137,3 +137,6 @@ tmux() {
 }
 
 eval "$(thefuck --alias)"
+
+# Source local configuration for secrets and machine-specific settings (not tracked in git)
+[[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
