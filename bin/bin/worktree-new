@@ -16,11 +16,11 @@ TYPE="$3"
 TICKET="$4"
 DESCRIPTION="$5"
 
-# Validate ticket format (WORD-XXXX)
-if ! [[ "$TICKET" =~ ^[A-Z]+-[0-9]+$ ]]; then
-    echo "Error: Ticket must be in format WORD-XXXX (e.g., ECOM-1234)"
-    exit 1
-fi
+# # Validate ticket format (WORD-XXXX)
+# if ! [[ "$TICKET" =~ ^[A-Z]+-[0-9]+$ ]]; then
+#     echo "Error: Ticket must be in format WORD-XXXX (e.g., ECOM-1234)"
+#     exit 1
+# fi
 
 # Validate description (kebab-case)
 if ! [[ "$DESCRIPTION" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then

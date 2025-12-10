@@ -34,13 +34,17 @@ if ! git diff-index --quiet HEAD --; then
     exit 1
 fi
 
+# Fetch latest remote refs
+echo "Fetching latest remote branches..."
+git fetch origin
+
 # Check if branch exists locally
 if git show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
     echo "Using local branch '$BRANCH_NAME'"
 # Check if branch exists remotely
 elif git show-ref --verify --quiet "refs/remotes/origin/$BRANCH_NAME"; then
-    echo "Branch '$BRANCH_NAME' exists remotely, fetching and checking out..."
-    git fetch origin "$BRANCH_NAME:$BRANCH_NAME"
+    echo "Branch '$BRANCH_NAME' exists remotely, creating local branch..."
+    git branch "$BRANCH_NAME" "origin/$BRANCH_NAME"
 else
     echo "Error: Branch '$BRANCH_NAME' does not exist locally or remotely"
     echo ""
