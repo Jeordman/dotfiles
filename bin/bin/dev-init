@@ -58,13 +58,19 @@ setup_workflow() {
   local server_window_name="shell"
   local server_command=""
 
+  # Check if directory name contains "UFeelGreat" and set nvm prefix
+  local nvm_prefix=""
+  if [[ "$SESSION_NAME" == *"UFeelGreat"* ]] || [[ "$WORK_DIR" == *"UFeelGreat"* ]]; then
+    nvm_prefix="nvm use 16 && "
+  fi
+
   # Check if package.json exists and FORCE_SHELL is not set
   if [ -f "$WORK_DIR/package.json" ] && [ "$FORCE_SHELL" = false ]; then
     server_window_name="dev"
-    server_command="npm run dev"
+    server_command="${nvm_prefix}npm run dev"
     # Only run npm ci if node_modules doesn't exist and package-lock.json exists
     if [ ! -d "$WORK_DIR/node_modules" ] && [ -f "$WORK_DIR/package-lock.json" ]; then
-      server_command="npm ci && npm run dev"
+      server_command="${nvm_prefix}npm ci && npm run dev"
     fi
   fi
 
