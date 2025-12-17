@@ -125,7 +125,14 @@ tmux() {
     if ! command tmux has-session 2>/dev/null; then
       # No sessions exist, create a new default one
       echo "No tmux sessions found. Creating new session..."
-      command tmux new-session -d -s "THE SPIRE" -c ~
+      # Check if btop exists and create session accordingly
+      if command -v btop &> /dev/null; then
+        # Create session with btop running in a window named pulse
+        command tmux new-session -d -s "THE SPIRE" -n "pulse" -c ~ "btop"
+      else
+        # Create session with default shell
+        command tmux new-session -d -s "THE SPIRE" -c ~
+      fi
       command tmux attach-session -t "THE SPIRE"
     else
       # Session exists, proceed normally
