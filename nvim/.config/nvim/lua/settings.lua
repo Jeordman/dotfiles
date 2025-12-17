@@ -8,6 +8,10 @@ vim.opt.wrap = false
 -- colorcolumn is a vertical line at the specified column number
 vim.opt.colorcolumn = '80'
 
+-- Preserve original file line endings
+vim.opt.fileformats = 'unix,dos,mac' -- Detect all formats (unix first = default for new files)
+vim.opt.fixendofline = false -- Don't add missing EOL at end of file
+
 -- Set to true if you have a Nerd Font installed and selected in the terminal
 vim.g.have_nerd_font = true
 
