@@ -33,18 +33,19 @@ backup_if_exists "$HOME/.zshrc"
 backup_if_exists "$HOME/.tmux.conf"
 backup_if_exists "$HOME/.config/nvim"
 backup_if_exists "$HOME/.config/ghostty"
+backup_if_exists "$HOME/.config/btop"
 
 # Stow all configurations
 # Using -R (restow) to handle existing symlinks gracefully
 log_info "Creating symlinks with GNU Stow..."
 
 if [[ "$DRY_RUN" == "true" ]]; then
-    log_info "[DRY RUN] Would run: stow -R -v bin claude ghostty nvim tmux yazi zsh"
+    log_info "[DRY RUN] Would run: stow -R -v bin btop claude ghostty nvim tmux yazi zsh"
 else
     # Check which directories exist before stowing
     local stow_targets=()
 
-    for dir in bin claude ghostty nvim tmux yazi zsh; do
+    for dir in bin btop claude ghostty nvim tmux yazi zsh; do
         if [ -d "$DOTFILES_DIR/$dir" ]; then
             stow_targets+=("$dir")
         else

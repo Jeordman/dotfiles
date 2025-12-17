@@ -42,6 +42,9 @@ log_info "Installing modern CLI tools..."
 # bat (better cat)
 ensure_package "bat" "bat" "bat"
 
+# btop (system monitor)
+ensure_package "btop" "btop" "btop"
+
 # eza (better ls)
 if [[ "$OS_TYPE" == "macos" ]]; then
     ensure_package "eza" "eza" "eza"
