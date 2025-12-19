@@ -45,8 +45,8 @@ WORK_DIR="$(cd "$WORK_DIR" && pwd)"
 # Auto-derive session name from directory name
 SESSION_NAME="$(basename "$WORK_DIR")"
 
-# Check if session already exists
-if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
+# Check if session already exists (use exact match with =)
+if tmux has-session -t "=$SESSION_NAME" 2>/dev/null; then
   echo "Error: Session '$SESSION_NAME' already exists"
   echo "Use: tmux kill-session -t $SESSION_NAME"
   exit 1
