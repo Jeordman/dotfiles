@@ -207,6 +207,78 @@ Remove one or more worktrees, but only if code is committed and pushed.
 - Kills associated tmux sessions automatically
 - Protects main repository from accidental deletion
 
+### `/plan-feature` - Interactive feature planning and documentation
+
+Plan and document large features interactively before implementing them. This command helps you think through architecture, identify affected files, and create a comprehensive implementation roadmap.
+
+**Usage:**
+```bash
+/plan-feature
+```
+
+Then describe your feature when prompted.
+
+**Example:**
+```
+You: /plan-feature
+
+Claude: What feature would you like to plan?
+
+You: A subscription management dashboard where users can view, pause, resume, and cancel their subscriptions
+
+Claude: Great! Let me explore your codebase to understand the current architecture...
+[Explores state management, existing patterns, API structure]
+
+Claude: I found you're using Zustand for state management. I have some questions:
+1. Should this be a new route or integrate into existing settings?
+2. Do you want real-time subscription status updates?
+3. Should we use optimistic UI updates for pause/resume actions?
+
+[You answer questions]
+
+Claude: Here's the Overview section for the plan:
+## Overview
+[Detailed overview based on your answers and codebase analysis]
+
+Should I add this to the markdown file?
+
+You: Yes
+
+Claude: Added! Now here's the Files to Create section...
+```
+
+**What it does:**
+1. Asks clarifying questions about requirements
+2. Explores your codebase to understand existing patterns
+3. Presents each section of the plan one at a time for approval:
+   - Overview and goals
+   - Files to create
+   - Files to modify (with line numbers)
+   - Component architecture
+   - State management approach
+   - API/data requirements
+   - Testing strategy
+   - **Detailed implementation steps** with code examples
+   - Potential issues and mitigations
+   - Open questions that need decisions
+4. Builds the plan incrementally based on your feedback
+5. Saves as `{feature_name}_plan.md`
+
+**Benefits:**
+- Think through large features before writing code
+- Get architectural guidance based on your existing patterns
+- Identify potential issues early
+- Create actionable implementation roadmap with specific steps
+- Document decisions for team review
+- Iterate on the plan before committing to code
+
+**Perfect for:**
+- Complex new features
+- Cross-cutting changes affecting multiple files
+- Features requiring architectural decisions
+- Team collaboration (creates shareable implementation plan)
+- Onboarding new developers to a feature
+
 ## Uninstalling
 
 To remove dotfile symlinks:
