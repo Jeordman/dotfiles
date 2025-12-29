@@ -110,5 +110,13 @@ if [ "$IN_TMUX" = false ]; then
   tmux attach-session -t "$SESSION_NAME"
 else
   echo "Switching to session: $SESSION_NAME"
+  # Capture current session and window to kill after switch
+  CURRENT_SESSION="$(tmux display-message -p '#S')"
+  CURRENT_WINDOW="$(tmux display-message -p '#I')"
+
+  # Switch to new session
   tmux switch-client -t "$SESSION_NAME"
+
+  # Kill the old window we came from
+  tmux kill-window -t "$CURRENT_SESSION:$CURRENT_WINDOW"
 fi
