@@ -73,6 +73,12 @@ The `claude/` package contains custom slash commands in `claude/.claude/commands
 
 When stowed, these become available in Claude Code across all projects.
 
+### Specs and Plans
+- A plan shows **how** to implement a feature step by step.
+- A spec defines **what** must always be true, regardless of implementation.
+- Plans can change or be discarded; specs act as the enduring contract.
+- Use specs to guide decisions, enforce correctness, and prevent accidental regressions.
+
 ## Important Reminders
 
 - Stow creates symlinks, doesn't copy files
