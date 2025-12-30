@@ -146,5 +146,15 @@ tmux() {
 
 eval "$(thefuck --alias)"
 
+-- run 'l' to list files after cd
+chpwd() {
+  l
+}
+
+# ctrl-x to edit command line
+autoload -Uz edit-command-line
+zle -N edit-command-line
+bindkey '^X' edit-command-line
+
 # Source local configuration for secrets and machine-specific settings (not tracked in git)
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
