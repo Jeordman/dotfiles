@@ -146,7 +146,7 @@ tmux() {
 
 eval "$(thefuck --alias)"
 
--- run 'l' to list files after cd
+# run 'l' to list files after cd
 chpwd() {
   l
 }
