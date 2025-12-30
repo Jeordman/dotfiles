@@ -115,7 +115,7 @@ alias uni='cd ~/unicity'
 alias docudocs="cd ~/unicity/docu-docs"
 alias newshop="cd ~/unicity/new-shop"
 alias ufeelgreat="cd ~/unicity/UFeelGreat/"
-alias l="eza -l --icons --group-directories-first --no-filesize"
+alias l="eza --icons --group-directories-first --no-filesize"
 
 # Tmux attach with auto-create - if no sessions exist, create one
 tmux() {
