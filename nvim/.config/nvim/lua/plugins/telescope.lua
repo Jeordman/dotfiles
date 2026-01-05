@@ -38,6 +38,24 @@ return { -- Fuzzy Finder (files, lsp, etc)
     -- do as well as how to actually do it!
 
     require('telescope').setup {
+      defaults = {
+        file_ignore_patterns = { '.git/', 'node_modules/' },
+        vimgrep_arguments = {
+          'rg',
+          '--color=never',
+          '--no-heading',
+          '--with-filename',
+          '--line-number',
+          '--column',
+          '--smart-case',
+          '--hidden',
+        },
+      },
+      pickers = {
+        find_files = {
+          hidden = true,
+        },
+      },
       extensions = {
         ['ui-select'] = {
           require('telescope.themes').get_dropdown(),

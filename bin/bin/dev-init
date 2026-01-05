@@ -2,15 +2,17 @@
 set -euo pipefail
 
 # dev-init - Initialize a tmux workflow with Claude, Neovim, and dev server
-# Usage: dev-init [-d DIRECTORY] [-s]
+# Usage: dev-init [-d DIRECTORY] [-s] [-k]
 #   -d DIRECTORY     Working directory (default: current directory)
 #   -s               Force shell (skip dev server even if package.json exists)
+#   -k               Keep current window (don't close it after switching)
 #
 # Session name is automatically derived from the directory name
 
 WORK_DIR="$(pwd)"
 IN_TMUX=false
 FORCE_SHELL=false
+KEEP_WINDOW=false
 
 # Check if we're in a tmux session
 if [ -n "${TMUX:-}" ]; then
@@ -18,11 +20,12 @@ if [ -n "${TMUX:-}" ]; then
 fi
 
 # Parse arguments
-while getopts "d:s" opt; do
+while getopts "d:sk" opt; do
   case $opt in
     d) WORK_DIR="$OPTARG" ;;
     s) FORCE_SHELL=true ;;
-    *) echo "Usage: $0 [-d DIRECTORY] [-s]"; exit 1 ;;
+    k) KEEP_WINDOW=true ;;
+    *) echo "Usage: $0 [-d DIRECTORY] [-s] [-k]"; exit 1 ;;
   esac
 done
 
@@ -110,13 +113,20 @@ if [ "$IN_TMUX" = false ]; then
   tmux attach-session -t "$SESSION_NAME"
 else
   echo "Switching to session: $SESSION_NAME"
-  # Capture current session and window to kill after switch
-  CURRENT_SESSION="$(tmux display-message -p '#S')"
-  CURRENT_WINDOW="$(tmux display-message -p '#I')"
 
-  # Switch to new session
-  tmux switch-client -t "$SESSION_NAME"
+  # Only kill the old window if KEEP_WINDOW is false
+  if [ "$KEEP_WINDOW" = false ]; then
+    # Capture current session and window to kill after switch
+    CURRENT_SESSION="$(tmux display-message -p '#S')"
+    CURRENT_WINDOW="$(tmux display-message -p '#I')"
 
-  # Kill the old window we came from
-  tmux kill-window -t "$CURRENT_SESSION:$CURRENT_WINDOW"
+    # Switch to new session
+    tmux switch-client -t "$SESSION_NAME"
+
+    # Kill the old window we came from
+    tmux kill-window -t "$CURRENT_SESSION:$CURRENT_WINDOW"
+  else
+    # Just switch without killing
+    tmux switch-client -t "$SESSION_NAME"
+  fi
 fi
