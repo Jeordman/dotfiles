@@ -39,7 +39,7 @@ return { -- Fuzzy Finder (files, lsp, etc)
 
     require('telescope').setup {
       defaults = {
-        file_ignore_patterns = { '.git/', 'node_modules/' },
+        file_ignore_patterns = { '.git/', 'node_modules/', 'package%-lock%.json' },
         vimgrep_arguments = {
           'rg',
           '--color=never',
@@ -49,6 +49,7 @@ return { -- Fuzzy Finder (files, lsp, etc)
           '--column',
           '--smart-case',
           '--hidden',
+          '--glob=!package-lock.json',
         },
       },
       pickers = {
