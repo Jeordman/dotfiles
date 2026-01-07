@@ -121,7 +121,11 @@ fi
 # Remove worktree (must be run from main repo)
 echo "Removing worktree '$WORKTREE_PATH'..."
 cd "$MAIN_REPO"
-git worktree remove "$WORKTREE_PATH"
+if [ "$FORCE" = true ]; then
+    git worktree remove --force "$WORKTREE_PATH"
+else
+    git worktree remove "$WORKTREE_PATH"
+fi
 cd "$ORIGINAL_DIR"
 
 echo ""
