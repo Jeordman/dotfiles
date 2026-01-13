@@ -120,3 +120,13 @@ For each step:
 ```ts
 // Show exact structure, key logic, and imports
 // Enough detail that a teammate could write the code confidently
+```
+
+---
+
+## Output
+
+**CRITICAL:** After the plan is approved by the user, you MUST:
+1. Write the complete plan to a file named `{feature_name}.plan.md` in the current directory
+2. Use the Write tool to create this file
+3. DO NOT just print the plan to the console - ALWAYS create the file

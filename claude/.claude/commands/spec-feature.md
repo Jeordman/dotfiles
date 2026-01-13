@@ -87,8 +87,10 @@ This document represents **intent and constraints**, not architecture or executi
 
 ## Output
 
-Save the approved specification as:
-{feature_name}.spec.md
+**CRITICAL:** After the specification is approved by the user, you MUST:
+1. Write the complete specification to a file named `{feature_name}.spec.md` in the current directory
+2. Use the Write tool to create this file
+3. DO NOT just print the specification to the console - ALWAYS create the file
 
 ---
 

@@ -37,3 +37,5 @@ Generate a concise GitHub PR description in markdown format with the following s
 ```
 
 Analyze the current changes in the repository and generate an appropriate PR description following this format.
+
+**IMPORTANT:** Write the generated PR description to a new file called `pr-description.md` in the current directory using the Write tool. Do not just print it to the console.
