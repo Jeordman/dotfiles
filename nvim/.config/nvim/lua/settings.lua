@@ -67,6 +67,18 @@ vim.opt.cursorline = true
 -- Minimal number of screen lines to keep above and below the cursor.
 vim.opt.scrolloff = 10
 
+-- [[ Folding Configuration ]]
+-- Use indent-based folding for simplicity
+vim.opt.foldmethod = 'indent'
+-- Start with all folds open
+vim.opt.foldenable = true
+vim.opt.foldlevel = 99
+vim.opt.foldlevelstart = 99
+-- Show fold column in the gutter (0 to hide, 1 to show minimal)
+vim.opt.foldcolumn = '0'
+-- Minimum lines for a fold to be created
+vim.opt.foldminlines = 1
+
 -- if performing an operation that would fail due to unsaved changes in the buffer (like `:q`),
 -- instead raise a dialog asking if you wish to save the current file(s)
 -- See `:help 'confirm'`
@@ -74,6 +86,17 @@ vim.opt.confirm = true
 
 -- [[ Basic Keymaps ]]
 vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
+
+-- Folding keymaps
+-- Use <leader>f for fold operations menu
+vim.keymap.set('n', '<leader>ff', 'za', { desc = 'Toggle fold' })
+vim.keymap.set('n', '<leader>fo', 'zo', { desc = 'Open fold' })
+vim.keymap.set('n', '<leader>fc', 'zc', { desc = 'Close fold' })
+vim.keymap.set('n', '<leader>fa', 'zA', { desc = 'Toggle all folds recursively' })
+vim.keymap.set('n', '<leader>fO', 'zR', { desc = 'Open all folds' })
+vim.keymap.set('n', '<leader>fC', 'zM', { desc = 'Close all folds' })
+vim.keymap.set('n', '<leader>fr', 'zr', { desc = 'Reduce fold level' })
+vim.keymap.set('n', '<leader>fm', 'zm', { desc = 'More folds (increase level)' })
 
 -- Diagnostic keymaps
 vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
@@ -99,6 +122,15 @@ vim.filetype.add({
 
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
+
+-- Ensure folding is set up properly for each buffer
+vim.api.nvim_create_autocmd({'BufReadPost', 'FileReadPost'}, {
+  pattern = '*',
+  callback = function()
+    vim.opt_local.foldmethod = 'indent'
+    vim.opt_local.foldlevel = 99
+  end,
+})
 
 -- Highlight when yanking (copying) text
 --  Try it with `yap` in normal mode

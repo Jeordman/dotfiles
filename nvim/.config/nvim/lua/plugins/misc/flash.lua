@@ -11,13 +11,5 @@ return {
       end,
       desc = '[J]ump with Flash',
     },
-    {
-      '<leader>J',
-      mode = { 'n', 'x', 'o' },
-      function()
-        require('flash').treesitter()
-      end,
-      desc = '[J]ump Treesitter node',
-    },
   },
 }
