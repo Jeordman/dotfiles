@@ -24,6 +24,7 @@ require('lazy').setup({
   require 'plugins.misc.todo-comments',
   require 'plugins.mini',
   require 'plugins.nvim-treesitter',
+  require 'plugins.treesitter-context',
   require 'plugins.neo-tree',
   require 'plugins.lib.vim-visual-multi',
   require 'plugins.misc.indent-line',
