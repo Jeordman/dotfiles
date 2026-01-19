@@ -77,27 +77,27 @@ setup_workflow() {
     fi
   fi
 
-  # Create window 1 (Neovim)
+  # Create window 2 (Neovim)
   tmux new-window -t "$session" -n "neovim" -c "$WORK_DIR"
 
-  # Create window 2 (Dev server or shell)
+  # Create window 3 (Dev server or shell)
   tmux new-window -t "$session" -n "$server_window_name" -c "$WORK_DIR"
 
-  # Rename first window to claude
-  tmux rename-window -t "$session:0" "claude"
+  # Rename first window to claude (use 1 for 1-based indexing)
+  tmux rename-window -t "$session:1" "claude"
 
   # Send commands to each window
-  echo "Starting Claude in window 0..."
+  echo "Starting Claude in window 1..."
   tmux send-keys -t "$session:claude" "claude" Enter
 
-  echo "Starting Neovim in window 1..."
+  echo "Starting Neovim in window 2..."
   tmux send-keys -t "$session:neovim" "nvim ." Enter
 
   if [ -n "$server_command" ]; then
-    echo "Starting dev server in window 2..."
+    echo "Starting dev server in window 3..."
     tmux send-keys -t "$session:$server_window_name" "$server_command" Enter
   else
-    echo "Created shell terminal window 2..."
+    echo "Created shell terminal window 3..."
   fi
 }
 
