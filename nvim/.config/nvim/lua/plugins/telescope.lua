@@ -55,6 +55,15 @@ return { -- Fuzzy Finder (files, lsp, etc)
       pickers = {
         find_files = {
           hidden = true,
+          find_command = {
+            'rg',
+            '--files',
+            '--hidden',
+            '--no-ignore-vcs',  -- Don't respect .gitignore for version control
+            '--glob', '!node_modules/**',  -- Exclude node_modules
+            '--glob', '!.git/**',  -- Exclude .git directory
+            '--glob', '!package-lock.json',  -- Exclude package-lock.json
+          },
         },
       },
       extensions = {
