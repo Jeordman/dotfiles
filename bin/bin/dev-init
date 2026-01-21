@@ -70,11 +70,7 @@ setup_workflow() {
   # Check if package.json exists and FORCE_SHELL is not set
   if [ -f "$WORK_DIR/package.json" ] && [ "$FORCE_SHELL" = false ]; then
     server_window_name="dev"
-    server_command="${nvm_prefix}npm run dev"
-    # Only run npm ci if node_modules doesn't exist and package-lock.json exists
-    if [ ! -d "$WORK_DIR/node_modules" ] && [ -f "$WORK_DIR/package-lock.json" ]; then
-      server_command="${nvm_prefix}npm ci && npm run dev"
-    fi
+    server_command="${nvm_prefix}npm i && npm run dev"
   fi
 
   # Create window 2 (Neovim)
