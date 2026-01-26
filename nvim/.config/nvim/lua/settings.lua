@@ -120,6 +120,103 @@ vim.filetype.add({
   },
 })
 
+-- [[ Large File Handling ]]
+-- Disable heavy features for large files to prevent stuttering
+vim.g.large_file_size = 512 * 1024 -- 512KB
+vim.g.large_file_line_length = 3000 -- lines longer than this
+
+local large_file_group = vim.api.nvim_create_augroup('LargeFile', { clear = true })
+
+-- Check file size BEFORE reading - disable stuff early
+vim.api.nvim_create_autocmd('BufReadPre', {
+  group = large_file_group,
+  callback = function(args)
+    local file = args.file
+    local ok, stats = pcall(vim.uv.fs_stat, file)
+    if ok and stats and stats.size > vim.g.large_file_size then
+      vim.b[args.buf].large_file = true
+
+      -- Disable these BEFORE the file loads
+      vim.opt_local.eventignore:append({ 'FileType' }) -- prevent filetype plugins
+      vim.bo[args.buf].buftype = 'nowrite' -- treat as special buffer initially
+    end
+  end,
+})
+
+-- After reading, apply full restrictions
+vim.api.nvim_create_autocmd('BufReadPost', {
+  group = large_file_group,
+  callback = function(args)
+    local buf = args.buf
+
+    -- Check for long lines if not already marked
+    if not vim.b[buf].large_file then
+      local lines = vim.api.nvim_buf_get_lines(buf, 0, 50, false)
+      for _, line in ipairs(lines) do
+        if #line > vim.g.large_file_line_length then
+          vim.b[buf].large_file = true
+          break
+        end
+      end
+    end
+
+    if vim.b[buf].large_file then
+      vim.notify('Large file - minimal mode', vim.log.levels.WARN)
+
+      -- Reset buftype so we can edit/save
+      vim.bo[buf].buftype = ''
+      vim.opt_local.eventignore = ''
+
+      -- Kill ALL syntax/highlighting
+      vim.cmd('syntax clear')
+      vim.cmd('syntax off')
+      vim.bo[buf].syntax = ''
+      vim.bo[buf].filetype = ''
+      pcall(vim.treesitter.stop, buf)
+
+      -- Disable visual overhead
+      vim.opt_local.cursorline = false
+      vim.opt_local.cursorcolumn = false
+      vim.opt_local.relativenumber = false
+      vim.opt_local.number = false
+      vim.opt_local.signcolumn = 'no'
+      vim.opt_local.colorcolumn = ''
+      vim.opt_local.list = false
+      vim.opt_local.wrap = false
+
+      -- Disable folding
+      vim.opt_local.foldmethod = 'manual'
+      vim.opt_local.foldenable = false
+
+      -- Disable file features
+      vim.opt_local.spell = false
+      vim.opt_local.swapfile = false
+      vim.opt_local.undofile = false
+      vim.opt_local.undolevels = 100
+
+      -- Disable matchparen (the highlight matching brackets plugin)
+      vim.cmd('NoMatchParen')
+
+      -- Detach LSP
+      vim.schedule(function()
+        for _, client in ipairs(vim.lsp.get_clients({ bufnr = buf })) do
+          vim.lsp.buf_detach_client(buf, client.id)
+        end
+      end)
+
+      -- Detach gitsigns
+      pcall(function() require('gitsigns').detach(buf) end)
+
+      -- Disable indent-blankline
+      pcall(function() require('ibl').setup_buffer(buf, { enabled = false }) end)
+
+      -- Disable mini plugins for this buffer
+      pcall(function() vim.b[buf].miniindentscope_disable = true end)
+      pcall(function() vim.b[buf].minicursorword_disable = true end)
+    end
+  end,
+})
+
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
 
