@@ -127,8 +127,14 @@ tmux() {
       echo "No tmux sessions found. Creating new session..."
       # Check if btop exists and create session accordingly
       if command -v btop &> /dev/null; then
-        # Create session with btop running in a window named pulse
-        command tmux new-session -d -s "THE SPIRE" -n "pulse" -c ~ "btop"
+        # Navigate to unicity (if it exists) and create session with btop in a window named pulse
+        if command -v zoxide &> /dev/null && zoxide query uni &> /dev/null; then
+          local uni_dir
+          uni_dir=$(zoxide query uni)
+          command tmux new-session -d -s "THE SPIRE" -n "pulse" -c "$uni_dir" "btop"
+        else
+          command tmux new-session -d -s "THE SPIRE" -n "pulse" -c ~ "btop"
+        fi
       else
         # Create session with default shell
         command tmux new-session -d -s "THE SPIRE" -c ~
