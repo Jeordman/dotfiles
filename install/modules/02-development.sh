@@ -3,6 +3,13 @@
 # 02-development.sh - Development tools installation
 # Installs core development tools and utilities
 
+# Source libraries if not already loaded (allows standalone execution)
+if ! type log_info &> /dev/null; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    source "$SCRIPT_DIR/lib/core.sh"
+    source "$SCRIPT_DIR/lib/package-managers.sh"
+fi
+
 log_step "Installing Development Tools"
 
 # Neovim
@@ -55,18 +62,6 @@ else
     else
         log_success "GitHub CLI already installed"
     fi
-fi
-
-# Claude Code MCP for Playwright (for front-end development with Claude Code)
-if command -v npm &> /dev/null; then
-    log_info "Installing Playwright MCP globally..."
-    if [[ "$DRY_RUN" == "true" ]]; then
-        log_info "[DRY RUN] Would run: npm install -g @playwright/mcp"
-    else
-        npm install -g @playwright/mcp 2>/dev/null && log_success "Playwright MCP installed" || log_warning "Playwright MCP installation failed (may already be installed)"
-    fi
-else
-    log_warning "npm not found - skipping Playwright MCP installation"
 fi
 
 log_success "Development tools installation complete"

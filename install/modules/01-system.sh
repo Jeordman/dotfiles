@@ -3,6 +3,13 @@
 # 01-system.sh - Core system tools installation
 # Installs essential system utilities needed for development
 
+# Source libraries if not already loaded (allows standalone execution)
+if ! type log_info &> /dev/null; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    source "$SCRIPT_DIR/lib/core.sh"
+    source "$SCRIPT_DIR/lib/package-managers.sh"
+fi
+
 log_step "Installing Core System Tools"
 
 # GNU Stow (for managing dotfiles)

@@ -3,6 +3,13 @@
 # 03-terminal.sh - Terminal and shell enhancement tools
 # Installs zsh, oh-my-zsh, tmux, and modern CLI replacements
 
+# Source libraries if not already loaded (allows standalone execution)
+if ! type log_info &> /dev/null; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    source "$SCRIPT_DIR/lib/core.sh"
+    source "$SCRIPT_DIR/lib/package-managers.sh"
+fi
+
 log_step "Installing Terminal Enhancements"
 
 # Zsh
@@ -58,8 +65,9 @@ else
                     log_info "Installing eza via cargo..."
                     cargo install eza
                 else
-                    log_warning "eza installation requires cargo - skipping"
-                    log_info "Install rust/cargo first or use: apt install eza (if available)"
+                    log_warning "SKIPPED: eza requires Rust/Cargo which is not installed"
+                    log_info "To install Rust: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+                    log_info "Then re-run this installer to get eza"
                 fi
                 ;;
             dnf|pacman)
@@ -116,8 +124,9 @@ else
             cargo install resvg
             log_success "resvg installed"
         else
-            log_warning "resvg requires cargo - skipping"
-            log_info "Install rust/cargo first or install resvg manually"
+            log_warning "SKIPPED: resvg requires Rust/Cargo which is not installed"
+            log_info "To install Rust: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+            log_info "Then re-run this installer to get resvg"
         fi
     else
         log_success "resvg already installed"
@@ -147,14 +156,25 @@ if [ ! -d "$HOME/.nvm" ]; then
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
     # Install latest LTS version of Node.js
-    if command -v nvm &> /dev/null; then
+    if type nvm &> /dev/null; then
         log_info "Installing Node.js LTS..."
         nvm install --lts
         nvm use --lts
         log_success "Node.js LTS installed"
+    else
+        log_warning "NVM installed but could not be loaded - restart your shell and run: nvm install --lts"
     fi
 else
     log_success "NVM already installed"
+    # Ensure NVM is loaded and Node.js is available
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    if type nvm &> /dev/null && ! command -v node &> /dev/null; then
+        log_info "NVM loaded but Node.js not found, installing LTS..."
+        nvm install --lts
+        nvm use --lts
+        log_success "Node.js LTS installed"
+    fi
 fi
 
 # Oh My Zsh

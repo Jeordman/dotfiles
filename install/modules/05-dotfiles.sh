@@ -3,6 +3,13 @@
 # 05-dotfiles.sh - Dotfiles linking with GNU Stow
 # Creates backups and symlinks dotfiles to home directory
 
+# Source libraries if not already loaded (allows standalone execution)
+if ! type log_info &> /dev/null; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    source "$SCRIPT_DIR/lib/core.sh"
+    source "$SCRIPT_DIR/lib/package-managers.sh"
+fi
+
 log_step "Linking Dotfiles with GNU Stow"
 
 cd "$DOTFILES_DIR" || {
