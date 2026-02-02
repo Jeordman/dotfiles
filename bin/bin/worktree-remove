@@ -50,6 +50,11 @@ echo ""
 # Save current directory
 ORIGINAL_DIR=$(pwd)
 
+# Resolve to absolute path before any cd
+cd "$WORKTREE_PATH"
+WORKTREE_PATH=$(pwd)
+cd "$ORIGINAL_DIR"
+
 # Change to worktree directory to check git status
 cd "$WORKTREE_PATH"
 
@@ -59,6 +64,8 @@ if ! git rev-parse --git-dir > /dev/null 2>&1; then
     cd "$ORIGINAL_DIR"
     exit 1
 fi
+
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 if [ "$FORCE" = false ]; then
     # Check for uncommitted changes
@@ -73,7 +80,6 @@ if [ "$FORCE" = false ]; then
     fi
 
     # Check for unpushed commits
-    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
     UPSTREAM_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo "")
 
     if [ -n "$UPSTREAM_BRANCH" ]; then
@@ -122,7 +128,15 @@ fi
 echo "Removing worktree '$WORKTREE_PATH'..."
 cd "$MAIN_REPO"
 if [ "$FORCE" = true ]; then
-    git worktree remove --force "$WORKTREE_PATH"
+    if ! git worktree remove --force "$WORKTREE_PATH" 2>/dev/null; then
+        echo "git worktree remove failed (likely untracked files). Removing directory manually..."
+        if [ -z "$WORKTREE_PATH" ] || [ "$WORKTREE_PATH" = "/" ] || [ "$WORKTREE_PATH" = "$HOME" ]; then
+            echo "Error: Refusing to rm -rf dangerous path: '$WORKTREE_PATH'"
+            exit 1
+        fi
+        rm -rf "$WORKTREE_PATH"
+        git worktree prune
+    fi
 else
     git worktree remove "$WORKTREE_PATH"
 fi
