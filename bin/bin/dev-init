@@ -112,15 +112,16 @@ else
 
   # Only kill the old window if KEEP_WINDOW is false
   if [ "$KEEP_WINDOW" = false ]; then
-    # Capture current session and window to kill after switch
+    # Capture current session, window, and pane to kill after switch
     CURRENT_SESSION="$(tmux display-message -p '#S')"
     CURRENT_WINDOW="$(tmux display-message -p '#I')"
+    CURRENT_PANE="$(tmux display-message -p '#P')"
 
     # Switch to new session
     tmux switch-client -t "$SESSION_NAME"
 
-    # Kill the old window we came from
-    tmux kill-window -t "$CURRENT_SESSION:$CURRENT_WINDOW"
+    # Kill the old pane we came from (kills window if it was the only pane)
+    tmux kill-pane -t "$CURRENT_SESSION:$CURRENT_WINDOW.$CURRENT_PANE"
   else
     # Just switch without killing
     tmux switch-client -t "$SESSION_NAME"
