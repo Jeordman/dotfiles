@@ -140,10 +140,14 @@ if [ "$FORCE" = true ]; then
 else
     git worktree remove "$WORKTREE_PATH"
 fi
-cd "$ORIGINAL_DIR"
+
+# Delete the branch (still in MAIN_REPO)
+echo "Deleting branch '$CURRENT_BRANCH'..."
+if [ "$FORCE" = true ]; then
+    git branch -D "$CURRENT_BRANCH"
+else
+    git branch -d "$CURRENT_BRANCH"
+fi
 
 echo ""
-echo "✓ Worktree removed successfully!"
-echo ""
-echo "Note: The branch '$CURRENT_BRANCH' still exists locally."
-echo "To delete it, run: git branch -d $CURRENT_BRANCH"
+echo "✓ Worktree and branch removed successfully!"
