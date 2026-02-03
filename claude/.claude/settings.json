@@ -16,6 +16,10 @@
       "Bash(file *)",
       "Bash(stat *)",
 
+      "Bash(git rev-parse:*)",
+      "Bash(git checkout:*)",
+      "Bash(dev-init:*)",
+
       "Bash(echo *)",
       "Bash(printf *)",
       "Bash(date *)",
