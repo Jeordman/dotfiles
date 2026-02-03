@@ -36,6 +36,8 @@
       "Bash(python *)",
       "Bash(python3 *)",
 
+      "Bash(git show *)",
+
       "Edit",
       "Write",
       "NotebookEdit"
