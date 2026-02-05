@@ -1,13 +1,24 @@
 {
   "alwaysThinkingEnabled": true,
   "hooks": {
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "SESSION=$(tmux display-message -p '#S' 2>/dev/null || echo 'unknown'); osascript -e \"display notification \\\"Permission needed\\\" with title \\\"$SESSION\\\" sound name \\\"Glass\\\"\""
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "SESSION=$(tmux display-message -p '#S' 2>/dev/null || echo 'unknown'); osascript -e \"display notification \\\"Awaiting input\\\" with title \\\"$SESSION\\\"\""
+            "command": "SESSION=$(tmux display-message -p '#S' 2>/dev/null || echo 'unknown'); osascript -e \"display notification \\\"Awaiting input\\\" with title \\\"$SESSION\\\" sound name \\\"Glass\\\"\""
           }
         ]
       }
