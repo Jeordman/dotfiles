@@ -44,6 +44,9 @@
       "Bash(git diff *)",
       "Bash(git log *)",
 
+      "Read",
+      "Glob",
+      "Grep",
       "Edit",
       "Write",
       "NotebookEdit"

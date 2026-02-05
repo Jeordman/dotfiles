@@ -64,4 +64,12 @@ else
     fi
 fi
 
+# Claude Code (Anthropic CLI)
+if ! command -v claude &> /dev/null; then
+    log_info "Installing Claude Code..."
+    safe_curl_install "https://claude.ai/install.sh" "Claude Code"
+else
+    log_success "Claude Code already installed"
+fi
+
 log_success "Development tools installation complete"
