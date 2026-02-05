@@ -1,5 +1,18 @@
 {
   "alwaysThinkingEnabled": true,
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "SESSION=$(tmux display-message -p '#S' 2>/dev/null || echo 'unknown'); osascript -e \"display notification \\\"Awaiting input\\\" with title \\\"$SESSION\\\"\""
+          }
+        ]
+      }
+    ]
+  },
   "permissions": {
     "allow": [
       "Bash(pwd)",
@@ -72,6 +85,12 @@
     ],
 
     "deny": [
+      "Bash(cat *.env*)",
+      "Bash(head *.env*)",
+      "Bash(tail *.env*)",
+      "Bash(less *.env*)",
+      "Bash(more *.env*)",
+
       "Bash(ssh *)",
       "Bash(rsync *)",
       "Bash(scp *)",
