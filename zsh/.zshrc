@@ -109,12 +109,6 @@ alias multipull="find . -mindepth 1 -maxdepth 1 -type d ! -name '.*' -print -exe
 # alias multimain='find . -mindepth 1 -maxdepth 1 -type d -print -exec sh -c '\''cd "$1" && (git checkout main 2>/dev/null || git checkout master)'\'' _ {} \;'
 # alias multi='multimain && multipull'
 alias multi='multipull'
-alias config='cd ~/dotfiles/nvim/.config/nvim/'
-alias dotfiles='cd ~/dotfiles/'
-alias uni='cd ~/unicity'
-alias docudocs="cd ~/unicity/docu-docs"
-alias newshop="cd ~/unicity/new-shop"
-alias ufeelgreat="cd ~/unicity/UFeelGreat/"
 alias l="eza --icons --group-directories-first --no-filesize"
 
 # Tmux attach with auto-create - if no sessions exist, create one
