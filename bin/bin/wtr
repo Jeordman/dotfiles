@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -e
 
-# Usage: worktree-remove <worktree-path-or-name> [--force]
-# Example: worktree-remove ../new-shop-fix-ECOM-4342-test
-# Example: worktree-remove new-shop-fix-ECOM-4342-test
-# Example: worktree-remove ../new-shop-fix-ECOM-4342-test --force
+# Usage: wtr <worktree-path-or-name> [--force]
+# Example: wtr ../new-shop-fix-ECOM-4342-test
+# Example: wtr new-shop-fix-ECOM-4342-test
+# Example: wtr ../new-shop-fix-ECOM-4342-test --force
 
 if [ "$#" -lt 1 ]; then
-    echo "Usage: worktree-remove <worktree-path-or-name> [--force]"
-    echo "Example: worktree-remove ../new-shop-fix-ECOM-4342-test"
-    echo "Example: worktree-remove new-shop-fix-ECOM-4342-test"
+    echo "Usage: wtr <worktree-path-or-name> [--force]"
+    echo "Example: wtr ../new-shop-fix-ECOM-4342-test"
+    echo "Example: wtr new-shop-fix-ECOM-4342-test"
     echo ""
     echo "Options:"
     echo "  --force    Skip safety checks (uncommitted changes, unpushed commits)"
@@ -68,8 +68,9 @@ fi
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 if [ "$FORCE" = false ]; then
-    # Check for uncommitted changes
-    if ! git diff-index --quiet HEAD --; then
+    # Check for uncommitted changes (ignore lock files)
+    CHANGED_FILES=$(git diff-index --name-only HEAD -- | grep -v -E '(package-lock\.json|yarn\.lock|pnpm-lock\.yaml)' || true)
+    if [ -n "$CHANGED_FILES" ]; then
         echo "Error: Worktree has uncommitted changes. Commit or stash them first."
         echo ""
         git status --short

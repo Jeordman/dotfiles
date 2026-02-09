@@ -38,6 +38,7 @@ require('lazy').setup({
   require 'plugins.misc.lazygit',
   require 'plugins.misc.neoscroll',
   require 'plugins.misc.flash',
+  require 'plugins.misc.render-markdown',
   require 'plugins.git.diffview',
 }, {
   ui = {

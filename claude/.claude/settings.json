@@ -1,5 +1,86 @@
 {
-  "alwaysThinkingEnabled": true,
+  "permissions": {
+    "allow": [
+      "Bash(pwd)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(find *)",
+      "Bash(grep *)",
+      "Bash(rg *)",
+      "Bash(fd *)",
+      "Bash(tree *)",
+      "Bash(wc *)",
+      "Bash(file *)",
+      "Bash(stat *)",
+      "Bash(git rev-parse:*)",
+      "Bash(git checkout:*)",
+      "Bash(dev-init:*)",
+      "Bash(echo *)",
+      "Bash(printf *)",
+      "Bash(date *)",
+      "Bash(whoami)",
+      "Bash(hostname)",
+      "Bash(uname *)",
+      "Bash(mkdir *)",
+      "Bash(touch *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(node *)",
+      "Bash(npx *)",
+      "Bash(npm run *)",
+      "Bash(npm test *)",
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(git show *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Read",
+      "Glob",
+      "Grep",
+      "Edit",
+      "Write",
+      "NotebookEdit"
+    ],
+    "deny": [
+      "Bash(cat *.env*)",
+      "Bash(head *.env*)",
+      "Bash(tail *.env*)",
+      "Bash(less *.env*)",
+      "Bash(more *.env*)",
+      "Bash(ssh *)",
+      "Bash(rsync *)",
+      "Bash(scp *)",
+      "Bash(sudo *)",
+      "Bash(crontab *)",
+      "Bash(launchctl *)",
+      "Bash(systemctl *)",
+      "Bash(chmod *)",
+      "Bash(chown *)",
+      "Bash(brew *)",
+      "Bash(docker *)",
+      "Bash(kubectl *)",
+      "Bash(terraform *)",
+      "Bash(cargo *)",
+      "Bash(go *)",
+      "Bash(rustc *)"
+    ],
+    "ask": [
+      "Bash(env)",
+      "Bash(printenv *)",
+      "Bash(npm install *)",
+      "Bash(npx *)",
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(git status *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(rm *)",
+      "Bash(rm -r *)",
+      "Bash(rm -rf *)"
+    ]
+  },
   "hooks": {
     "PermissionRequest": [
       {
@@ -24,104 +105,5 @@
       }
     ]
   },
-  "permissions": {
-    "allow": [
-      "Bash(pwd)",
-      "Bash(ls *)",
-      "Bash(cat *)",
-      "Bash(head *)",
-      "Bash(tail *)",
-      "Bash(find *)",
-      "Bash(grep *)",
-      "Bash(rg *)",
-      "Bash(fd *)",
-      "Bash(tree *)",
-      "Bash(wc *)",
-      "Bash(file *)",
-      "Bash(stat *)",
-
-      "Bash(git rev-parse:*)",
-      "Bash(git checkout:*)",
-      "Bash(dev-init:*)",
-
-      "Bash(echo *)",
-      "Bash(printf *)",
-      "Bash(date *)",
-      "Bash(whoami)",
-      "Bash(hostname)",
-      "Bash(uname *)",
-
-      "Bash(mkdir *)",
-      "Bash(touch *)",
-      "Bash(cp *)",
-      "Bash(mv *)",
-
-      "Bash(node *)",
-      "Bash(npx *)",
-      "Bash(npm run *)",
-      "Bash(npm test *)",
-
-      "Bash(python *)",
-      "Bash(python3 *)",
-
-      "Bash(git show *)",
-      "Bash(git diff *)",
-      "Bash(git log *)",
-
-      "Read",
-      "Glob",
-      "Grep",
-      "Edit",
-      "Write",
-      "NotebookEdit"
-    ],
-
-    "ask": [
-      "Bash(env)",
-      "Bash(printenv *)",
-
-      "Bash(npm install *)",
-      "Bash(npx *)",
-
-      "Bash(curl *)",
-      "Bash(wget *)",
-
-      "Bash(git status *)",
-      "Bash(git commit *)",
-      "Bash(git push *)",
-
-      "Bash(rm *)",
-      "Bash(rm -r *)",
-      "Bash(rm -rf *)"
-    ],
-
-    "deny": [
-      "Bash(cat *.env*)",
-      "Bash(head *.env*)",
-      "Bash(tail *.env*)",
-      "Bash(less *.env*)",
-      "Bash(more *.env*)",
-
-      "Bash(ssh *)",
-      "Bash(rsync *)",
-      "Bash(scp *)",
-
-      "Bash(sudo *)",
-      "Bash(crontab *)",
-      "Bash(launchctl *)",
-      "Bash(systemctl *)",
-
-      "Bash(chmod *)",
-      "Bash(chown *)",
-
-      "Bash(brew *)",
-      "Bash(docker *)",
-      "Bash(kubectl *)",
-      "Bash(terraform *)",
-
-      "Bash(cargo *)",
-      "Bash(go *)",
-      "Bash(rustc *)"
-    ]
-  }
+  "alwaysThinkingEnabled": true
 }

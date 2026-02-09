@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -e
 
-# Usage: worktree-new <project> <base-branch> <type> <ticket> <description>
-# Example: worktree-new ClimbSmarter main feat ECOM-1234 checkout-flow
+# Usage: wtn <project> <base-branch> <type> <ticket> <description>
+# Example: wtn ClimbSmarter main feat ECOM-1234 checkout-flow
 
 if [ "$#" -ne 5 ]; then
-    echo "Usage: worktree-new <project> <base-branch> <type> <ticket> <description>"
-    echo "Example: worktree-new ClimbSmarter main feat ECOM-1234 checkout-flow"
+    echo "Usage: wtn <project> <base-branch> <type> <ticket> <description>"
+    echo "Example: wtn ClimbSmarter main feat ECOM-1234 checkout-flow"
     exit 1
 fi
 

@@ -165,18 +165,18 @@ stow bin claude ghostty nvim tmux yazi zsh
 
 This dotfiles repo includes custom slash commands for Claude Code integration:
 
-### `/worktree-init` - Create feature branch with worktree and tmux session
+### `/wtn` - Create feature branch with worktree and tmux session
 
 Initialize a new git worktree with a feature branch and tmux session for parallel development.
 
 **Usage:**
 ```bash
-/worktree-init <project> <base-branch> <type> <ticket> <description>
+/wtn <project> <base-branch> <type> <ticket> <description>
 ```
 
 **Example:**
 ```bash
-/worktree-init ClimbSmarter main feat ECOM-1234 checkout-flow
+/wtn ClimbSmarter main feat ECOM-1234 checkout-flow
 ```
 
 **What it does:**
@@ -186,19 +186,19 @@ Initialize a new git worktree with a feature branch and tmux session for paralle
 4. Initializes a tmux session for the worktree
 5. Attaches you to the new tmux session
 
-### `/worktree-remove` - Safely remove worktrees
+### `/wtr` - Safely remove worktrees
 
 Remove one or more worktrees, but only if code is committed and pushed.
 
 **Usage:**
 ```bash
-/worktree-remove <name-or-all>
+/wtr <name-or-all>
 ```
 
 **Examples:**
 ```bash
-/worktree-remove all                                    # Remove all clean worktrees
-/worktree-remove ClimbSmarter-feat-ECOM-1234-checkout  # Remove specific worktree
+/wtr all                                    # Remove all clean worktrees
+/wtr ClimbSmarter-feat-ECOM-1234-checkout  # Remove specific worktree
 ```
 
 **Safety checks:**

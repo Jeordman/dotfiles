@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -e
 
-# Usage: worktree-existing <project> <branch-name>
-# Example: worktree-existing ClimbSmarter feat/ECOM-1234-checkout-flow
+# Usage: wte <project> <branch-name>
+# Example: wte ClimbSmarter feat/ECOM-1234-checkout-flow
 
 if [ "$#" -ne 2 ]; then
-    echo "Usage: worktree-existing <project> <branch-name>"
-    echo "Example: worktree-existing ClimbSmarter feat/ECOM-1234-checkout-flow"
+    echo "Usage: wte <project> <branch-name>"
+    echo "Example: wte ClimbSmarter feat/ECOM-1234-checkout-flow"
     exit 1
 fi
 
