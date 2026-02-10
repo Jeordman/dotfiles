@@ -70,7 +70,6 @@
       "Bash(env)",
       "Bash(printenv *)",
       "Bash(npm install *)",
-      "Bash(npx *)",
       "Bash(curl *)",
       "Bash(wget *)",
       "Bash(git status *)",
