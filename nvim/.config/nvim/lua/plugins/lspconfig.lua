@@ -248,6 +248,7 @@ return {
             workingDirectories = { mode = 'auto' },
           },
         },
+        biome = {},
         taplo = {}, -- TOML LSP
 
         lua_ls = {
