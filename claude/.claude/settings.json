@@ -87,7 +87,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "SESSION=$(tmux display-message -p '#S' 2>/dev/null || echo 'unknown'); osascript -e \"display notification \\\"Permission needed\\\" with title \\\"$SESSION\\\" sound name \\\"Glass\\\"\""
+            "command": "SESSION=$(tmux display-message -p '#S' 2>/dev/null || echo 'unknown'); for P in new-shop-; do SESSION=${SESSION#$P}; done; osascript -e \"display notification \\\"Permission needed\\\" with title \\\"$SESSION\\\" sound name \\\"Glass\\\"\""
           }
         ]
       }
@@ -98,7 +98,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "SESSION=$(tmux display-message -p '#S' 2>/dev/null || echo 'unknown'); osascript -e \"display notification \\\"Awaiting input\\\" with title \\\"$SESSION\\\" sound name \\\"Glass\\\"\""
+            "command": "SESSION=$(tmux display-message -p '#S' 2>/dev/null || echo 'unknown'); for P in new-shop-; do SESSION=${SESSION#$P}; done; osascript -e \"display notification \\\"Awaiting input\\\" with title \\\"$SESSION\\\" sound name \\\"Glass\\\"\""
           }
         ]
       }
