@@ -83,7 +83,7 @@ if git show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
 else
     echo "Creating branch '$BRANCH_NAME' from '$BASE_REF'..."
     CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-    git checkout -b "$BRANCH_NAME" "$BASE_REF"
+    git checkout -b "$BRANCH_NAME" --no-track "$BASE_REF"
 fi
 
 # Return to original branch
