@@ -18,6 +18,9 @@ return {
     require('neo-tree').setup {
       window = {
         position = 'right',
+        mappings = {
+          ['/'] = 'noop',
+        },
       },
     }
   end,
