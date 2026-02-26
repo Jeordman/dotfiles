@@ -7,4 +7,6 @@ prepend_keymap = [
   { on  = ["g", "u"], run = "cd ~/unicity", desc = "Go to Unicity" },
   { on  = ["g", "c"], run = "cd ~/dotfiles/nvim/.config/nvim/", desc = "Go to Nvim Config" },
   { on  = ["g", "d"], run = "cd ~/dotfiles/", desc = "Go to Dotfiles" },
+
+  { on = "<Space>", run = "toggle", desc = "Toggle selection" },
 ]
