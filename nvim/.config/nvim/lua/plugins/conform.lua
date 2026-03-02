@@ -109,6 +109,8 @@ return { -- code formatter
         condition = function(self, ctx)
           return not has_config(ctx, prettier_configs) and not has_config(ctx, eslint_configs)
         end,
+        args = { 'format', '--indent-style=space', '--indent-width=2', '--write', '$FILENAME' },
+        stdin = false,
       },
     },
   },
