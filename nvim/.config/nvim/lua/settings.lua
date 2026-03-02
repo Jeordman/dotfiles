@@ -114,6 +114,8 @@ vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper win
 vim.filetype.add({
   filename = {
     ['.env'] = 'sh',
+    ['.env.local'] = 'sh',
+    ['.env.example'] = 'sh',
   },
   pattern = {
     ['%.env%.[%w_.-]+'] = 'sh', -- .env.local, .env.development, etc.
@@ -123,7 +125,7 @@ vim.filetype.add({
 -- [[ Large File Handling ]]
 -- Disable heavy features for large files to prevent stuttering
 vim.g.large_file_size = 512 * 1024 -- 512KB
-vim.g.large_file_line_length = 3000 -- lines longer than this
+vim.g.large_file_line_length = 10000 -- lines longer than this
 
 local large_file_group = vim.api.nvim_create_augroup('LargeFile', { clear = true })
 
