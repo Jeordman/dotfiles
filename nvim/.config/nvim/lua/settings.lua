@@ -219,6 +219,105 @@ vim.api.nvim_create_autocmd('BufReadPost', {
   end,
 })
 
+-- Toggle large file minimal mode off/on for the current buffer
+local function toggle_large_file_mode()
+  local buf = vim.api.nvim_get_current_buf()
+
+  if vim.b[buf].large_file then
+    -- Restore full mode
+    vim.b[buf].large_file = false
+
+    -- Re-detect filetype (re-enables syntax, treesitter, filetype plugins)
+    vim.cmd('filetype detect')
+    vim.cmd('syntax on')
+
+    -- Restore visual settings to global defaults
+    vim.opt_local.cursorline = true
+    vim.opt_local.relativenumber = false
+    vim.opt_local.number = true
+    vim.opt_local.signcolumn = 'yes'
+    vim.opt_local.colorcolumn = '80'
+    vim.opt_local.list = true
+    vim.opt_local.wrap = false
+
+    -- Restore folding
+    vim.opt_local.foldmethod = 'indent'
+    vim.opt_local.foldenable = true
+
+    -- Restore file features
+    vim.opt_local.swapfile = true
+    vim.opt_local.undofile = true
+    vim.opt_local.undolevels = 1000
+
+    -- Re-enable matchparen
+    pcall(vim.cmd, 'DoMatchParen')
+
+    -- Re-attach LSP
+    vim.schedule(function()
+      for _, client in ipairs(vim.lsp.get_clients()) do
+        if not vim.lsp.buf_is_attached(buf, client.id) then
+          pcall(vim.lsp.buf_attach_client, buf, client.id)
+        end
+      end
+    end)
+
+    -- Re-attach gitsigns
+    pcall(function() require('gitsigns').attach(buf) end)
+
+    -- Re-enable indent-blankline
+    pcall(function() require('ibl').setup_buffer(buf, { enabled = true }) end)
+
+    -- Re-enable mini plugins
+    pcall(function() vim.b[buf].miniindentscope_disable = false end)
+    pcall(function() vim.b[buf].minicursorword_disable = false end)
+
+    vim.notify('Large file - full mode restored', vim.log.levels.INFO)
+  else
+    -- Enter minimal mode manually
+    vim.b[buf].large_file = true
+
+    vim.cmd('syntax clear')
+    vim.cmd('syntax off')
+    vim.bo[buf].syntax = ''
+    vim.bo[buf].filetype = ''
+    pcall(vim.treesitter.stop, buf)
+
+    vim.opt_local.cursorline = false
+    vim.opt_local.cursorcolumn = false
+    vim.opt_local.relativenumber = false
+    vim.opt_local.number = false
+    vim.opt_local.signcolumn = 'no'
+    vim.opt_local.colorcolumn = ''
+    vim.opt_local.list = false
+    vim.opt_local.wrap = false
+
+    vim.opt_local.foldmethod = 'manual'
+    vim.opt_local.foldenable = false
+
+    vim.opt_local.spell = false
+    vim.opt_local.swapfile = false
+    vim.opt_local.undofile = false
+    vim.opt_local.undolevels = 100
+
+    pcall(vim.cmd, 'NoMatchParen')
+
+    vim.schedule(function()
+      for _, client in ipairs(vim.lsp.get_clients({ bufnr = buf })) do
+        vim.lsp.buf_detach_client(buf, client.id)
+      end
+    end)
+
+    pcall(function() require('gitsigns').detach(buf) end)
+    pcall(function() require('ibl').setup_buffer(buf, { enabled = false }) end)
+    pcall(function() vim.b[buf].miniindentscope_disable = true end)
+    pcall(function() vim.b[buf].minicursorword_disable = true end)
+
+    vim.notify('Large file - minimal mode', vim.log.levels.WARN)
+  end
+end
+
+vim.keymap.set('n', '<leader>tl', toggle_large_file_mode, { desc = '[T]oggle [L]arge file mode' })
+
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
 
