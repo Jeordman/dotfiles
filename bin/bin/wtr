@@ -117,12 +117,22 @@ cd "$ORIGINAL_DIR"
 echo "Safety checks passed. Removing worktree..."
 echo ""
 
-# Kill tmux session if it exists
-if tmux has-session -t "$WORKTREE_NAME" 2>/dev/null; then
+# Kill tmux session or close CMUX workspace if it exists
+if [ -n "${CMUX_WORKSPACE_ID:-}" ] && [ -z "${TMUX:-}" ]; then
+    # In CMUX: find and close workspace by name (strip new-shop- prefix to match dev-init-cmux naming)
+    CMUX_WS_NAME=$(echo "$WORKTREE_NAME" | sed 's/^new-shop-//')
+    WS_TO_CLOSE=$(cmux list-workspaces 2>/dev/null | grep -i "$CMUX_WS_NAME" | grep -oE 'workspace:[0-9]+' | head -1)
+    if [ -n "$WS_TO_CLOSE" ]; then
+        echo "Closing CMUX workspace '$WORKTREE_NAME'..."
+        cmux close-workspace --workspace "$WS_TO_CLOSE"
+    else
+        echo "No CMUX workspace found for '$WORKTREE_NAME'"
+    fi
+elif tmux has-session -t "$WORKTREE_NAME" 2>/dev/null; then
     echo "Killing tmux session '$WORKTREE_NAME'..."
     tmux kill-session -t "$WORKTREE_NAME"
 else
-    echo "No tmux session found for '$WORKTREE_NAME'"
+    echo "No tmux session or CMUX workspace found for '$WORKTREE_NAME'"
 fi
 
 # Remove worktree (must be run from main repo)

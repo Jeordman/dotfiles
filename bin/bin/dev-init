@@ -1,18 +1,27 @@
 #!/bin/bash
 set -euo pipefail
 
-# dev-init - Initialize a tmux workflow with Claude, Neovim, and dev server
-# Usage: dev-init [-d DIRECTORY] [-s] [-k]
+# dev-init - Initialize a workflow with Claude, Neovim, and dev server
+# Auto-detects tmux vs CMUX and dispatches accordingly.
+# Usage: dev-init [-d DIRECTORY] [-s] [-k] [-t TICKET]
 #   -d DIRECTORY     Working directory (default: current directory)
 #   -s               Force shell (skip dev server even if package.json exists)
-#   -k               Keep current window (don't close it after switching)
+#   -k               Keep current window (tmux only, ignored in CMUX)
+#   -t TICKET        Ticket ID to fetch from ClickUp and start Claude in plan mode
 #
 # Session name is automatically derived from the directory name
+
+# Auto-detect: if we're in CMUX (not tmux), delegate to dev-init-cmux
+if [ -n "${CMUX_WORKSPACE_ID:-}" ] && [ -z "${TMUX:-}" ]; then
+  # Forward all flags to dev-init-cmux (-d, -s, -t)
+  exec dev-init-cmux "$@"
+fi
 
 WORK_DIR="$(pwd)"
 IN_TMUX=false
 FORCE_SHELL=false
 KEEP_WINDOW=false
+TICKET=""
 
 # Check if we're in a tmux session
 if [ -n "${TMUX:-}" ]; then
@@ -20,12 +29,13 @@ if [ -n "${TMUX:-}" ]; then
 fi
 
 # Parse arguments
-while getopts "d:sk" opt; do
+while getopts "d:skt:" opt; do
   case $opt in
     d) WORK_DIR="$OPTARG" ;;
     s) FORCE_SHELL=true ;;
     k) KEEP_WINDOW=true ;;
-    *) echo "Usage: $0 [-d DIRECTORY] [-s] [-k]"; exit 1 ;;
+    t) TICKET="$OPTARG" ;;
+    *) echo "Usage: $0 [-d DIRECTORY] [-s] [-k] [-t TICKET]"; exit 1 ;;
   esac
 done
 
@@ -82,9 +92,15 @@ setup_workflow() {
   # Rename first window to claude (use 1 for 1-based indexing)
   tmux rename-window -t "$session:1" "claude"
 
+  # Build Claude command
+  local claude_cmd="claude"
+  if [ -n "$TICKET" ]; then
+    claude_cmd="claude --permission-mode plan \"Use the ClickUp MCP to search for task $TICKET. Read the task description and create an implementation plan.\""
+  fi
+
   # Send commands to each window
   echo "Starting Claude in window 1..."
-  tmux send-keys -t "$session:claude" "claude" Enter
+  tmux send-keys -t "$session:claude" "$claude_cmd" Enter
 
   echo "Starting Neovim in window 2..."
   tmux send-keys -t "$session:neovim" "nvim ." Enter

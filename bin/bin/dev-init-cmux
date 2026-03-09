@@ -1,0 +1,124 @@
+#!/bin/bash
+set -euo pipefail
+
+# dev-init-cmux - Initialize a CMUX workflow with Claude, Neovim, and dev server
+# Usage: dev-init-cmux [-d DIRECTORY] [-s] [-t TICKET]
+#   -d DIRECTORY     Working directory (default: current directory)
+#   -s               Force shell (skip dev server even if package.json exists)
+#   -t TICKET        Ticket ID to fetch from ClickUp and start Claude in plan mode
+#
+# Creates a workspace with 3 tabs:
+#   Tab 1: Claude Code
+#   Tab 2: Neovim
+#   Tab 3: Dev server or shell
+
+WORK_DIR="$(pwd)"
+FORCE_SHELL=false
+TICKET=""
+
+# Parse arguments
+while getopts "d:st:" opt; do
+  case $opt in
+    d) WORK_DIR="$OPTARG" ;;
+    s) FORCE_SHELL=true ;;
+    t) TICKET="$OPTARG" ;;
+    *) echo "Usage: $0 [-d DIRECTORY] [-s] [-t TICKET]"; exit 1 ;;
+  esac
+done
+
+# Try to find the directory
+if [ ! -d "$WORK_DIR" ]; then
+  FALLBACK_DIR="$HOME/unicity/$WORK_DIR"
+  if [ -d "$FALLBACK_DIR" ]; then
+    WORK_DIR="$FALLBACK_DIR"
+  else
+    echo "Error: Directory not found in current directory or ~/unicity/"
+    echo "Looked in: $WORK_DIR and $FALLBACK_DIR"
+    exit 1
+  fi
+fi
+
+# Convert to absolute path
+WORK_DIR="$(cd "$WORK_DIR" && pwd)"
+SESSION_NAME="$(basename "$WORK_DIR" | sed 's/^new-shop-//')"
+
+# Check cmux is available
+if ! command -v cmux &>/dev/null; then
+  echo "Error: cmux not found. Install from https://www.cmux.dev"
+  exit 1
+fi
+
+# Determine dev server command
+server_command=""
+if [ -f "$WORK_DIR/package.json" ] && [ "$FORCE_SHELL" = false ]; then
+  nvm_prefix=""
+  if [[ "$SESSION_NAME" == *"UFeelGreat"* ]] || [[ "$WORK_DIR" == *"UFeelGreat"* ]]; then
+    nvm_prefix="nvm use 16 && "
+  fi
+  server_command="${nvm_prefix}npm i && npm run dev"
+fi
+
+# Helper: send a command to a surface in the new workspace
+send_cmd() {
+  local surface="$1"
+  local cmd="$2"
+  cmux send --workspace "$WS_ID" --surface "$surface" "$cmd"
+  cmux send-key --workspace "$WS_ID" --surface "$surface" enter
+}
+
+# Create a new workspace
+echo "Creating CMUX workspace: $SESSION_NAME"
+WS_ID=$(cmux new-workspace | grep -oE '[A-F0-9-]{36}')
+
+# Rename the workspace in the sidebar
+cmux rename-workspace --workspace "$WS_ID" "$SESSION_NAME"
+
+# Move workspace to the bottom of the sidebar
+cmux reorder-workspace --workspace "$WS_ID" --index 999
+
+# Get the first surface (created with the workspace)
+# Output format: "* surface:14  Terminal 3  [selected]"
+TAB1=$(cmux list-pane-surfaces --workspace "$WS_ID" | grep -oE 'surface:[0-9]+' | head -1)
+
+# Create 2 more tabs
+# Output format: "OK surface:15 pane:9 workspace:6"
+TAB2=$(cmux new-surface --workspace "$WS_ID" | grep -oE 'surface:[0-9]+')
+TAB3=$(cmux new-surface --workspace "$WS_ID" | grep -oE 'surface:[0-9]+')
+
+# Rename tabs
+cmux rename-tab --workspace "$WS_ID" --surface "$TAB1" "claude"
+cmux rename-tab --workspace "$WS_ID" --surface "$TAB2" "neovim"
+if [ -n "$server_command" ]; then
+  cmux rename-tab --workspace "$WS_ID" --surface "$TAB3" "dev"
+else
+  cmux rename-tab --workspace "$WS_ID" --surface "$TAB3" "shell"
+fi
+
+# Build Claude command
+claude_cmd="claude"
+if [ -n "$TICKET" ]; then
+  claude_cmd="claude --permission-mode plan \"Use the ClickUp MCP to search for task $TICKET. Read the task description and create an implementation plan.\""
+fi
+
+# Send commands to each tab
+echo "Starting Claude in tab 1..."
+send_cmd "$TAB1" "cd $WORK_DIR"
+send_cmd "$TAB1" "$claude_cmd"
+
+echo "Starting Neovim in tab 2..."
+send_cmd "$TAB2" "cd $WORK_DIR"
+send_cmd "$TAB2" "nvim ."
+
+if [ -n "$server_command" ]; then
+  echo "Starting dev server in tab 3..."
+  send_cmd "$TAB3" "cd $WORK_DIR"
+  send_cmd "$TAB3" "$server_command"
+else
+  echo "Shell ready in tab 3."
+  send_cmd "$TAB3" "cd $WORK_DIR"
+fi
+
+# Switch to the new workspace
+cmux select-workspace --workspace "$WS_ID"
+
+echo "Workspace ready!"
