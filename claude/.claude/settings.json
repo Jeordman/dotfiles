@@ -46,7 +46,8 @@
       "Edit",
       "Write",
       "NotebookEdit",
-      "mcp__clickup__clickup_search"
+      "mcp__clickup__clickup_search",
+      "mcp__clickup__clickup_get_task"
     ],
     "deny": [
       "Bash(cat *.env*)",
