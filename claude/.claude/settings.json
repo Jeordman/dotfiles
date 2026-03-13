@@ -85,5 +85,14 @@
       "Bash(rm -r *)",
       "Bash(rm -rf *)"
     ]
-  }
+  },
+  "extraKnownMarketplaces": {
+    "anthropic-agent-skills": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/skills"
+      }
+    }
+  },
+  "voiceEnabled": true
 }
