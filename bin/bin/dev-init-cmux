@@ -68,7 +68,7 @@ send_cmd() {
 
 # Create a new workspace
 echo "Creating CMUX workspace: $SESSION_NAME"
-WS_ID=$(cmux new-workspace | grep -oE '[A-F0-9-]{36}')
+WS_ID=$(cmux new-workspace | grep -oE 'workspace:[0-9]+')
 
 # Rename the workspace in the sidebar
 cmux rename-workspace --workspace "$WS_ID" "$SESSION_NAME"
@@ -118,7 +118,12 @@ else
   send_cmd "$TAB3" "cd $WORK_DIR"
 fi
 
-# Switch to the new workspace
+# Switch to the new workspace and close the launcher terminal
+CALLER_SURFACE="${CMUX_SURFACE_ID:-}"
 cmux select-workspace --workspace "$WS_ID"
 
 echo "Workspace ready!"
+
+if [ -n "$CALLER_SURFACE" ]; then
+  cmux close-surface --surface "$CALLER_SURFACE"
+fi
