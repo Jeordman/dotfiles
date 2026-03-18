@@ -41,20 +41,13 @@ return { -- code formatter
         local conform = require 'conform'
         local formatters = conform.list_formatters(0)
         local names = vim.tbl_map(function(f) return f.name end, formatters)
+        local msg = #names > 0 and ('Formatting with ' .. table.concat(names, ', ')) or 'Formatting with LSP'
+        vim.api.nvim_echo({ { msg, 'Normal' } }, true, {})
         local range = vim.fn.mode() == 'v' and {
           start = vim.api.nvim_buf_get_mark(0, '<'),
           ['end'] = vim.api.nvim_buf_get_mark(0, '>'),
         } or nil
-        conform.format({ async = true, lsp_fallback = 'always', range = range }, function(err)
-          vim.schedule(function()
-            if err then return end
-            if #names > 0 then
-              vim.notify('Formatted with ' .. table.concat(names, ', '))
-            else
-              vim.notify('Formatted with LSP')
-            end
-          end)
-        end)
+        conform.format({ async = true, lsp_fallback = 'always', range = range })
       end,
       mode = { 'n', 'v' },
       desc = '[F]ormat buffer or selection',
