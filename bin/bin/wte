@@ -76,10 +76,16 @@ fi
 echo "Creating worktree..."
 git worktree add "$WORKTREE_PATH" "$BRANCH_NAME"
 
-# Copy env files if they exist
-if ls .env* 1> /dev/null 2>&1; then
+# Copy env files if they exist (supports monorepo with per-app env files)
+ENV_FILES=$(find . -name '.env*' -not -name '*.example' -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/dist/*' -not -path '*/.next/*' -not -path '*/.turbo/*' 2>/dev/null || true)
+if [ -n "$ENV_FILES" ]; then
     echo "Copying .env files..."
-    cp .env* "$WORKTREE_PATH/" 2>/dev/null || true
+    echo "$ENV_FILES" | while read -r envfile; do
+        envdir=$(dirname "$envfile")
+        mkdir -p "$WORKTREE_PATH/$envdir"
+        cp "$envfile" "$WORKTREE_PATH/$envfile"
+        echo "  $envfile"
+    done
 fi
 
 # Initialize tmux session
