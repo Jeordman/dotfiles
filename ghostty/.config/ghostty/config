@@ -1,5 +1,5 @@
 # Set background transparency (0.0 = fully transparent, 1.0 = opaque)
-background-opacity = 0.75
+background-opacity = 0.70
 
 # Enable blur behind the terminal
 background-blur = true

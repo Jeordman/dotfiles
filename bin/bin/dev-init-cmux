@@ -12,6 +12,10 @@ set -euo pipefail
 #   Tab 2: Neovim
 #   Tab 3: Dev server or shell
 
+pkg_manager() {
+  if command -v pnpm &>/dev/null; then echo "pnpm"; else echo "npm"; fi
+}
+
 WORK_DIR="$(pwd)"
 FORCE_SHELL=false
 TICKET=""
@@ -55,7 +59,7 @@ if [ -f "$WORK_DIR/package.json" ] && [ "$FORCE_SHELL" = false ]; then
   if [[ "$SESSION_NAME" == *"UFeelGreat"* ]] || [[ "$WORK_DIR" == *"UFeelGreat"* ]]; then
     nvm_prefix="nvm use 16 && "
   fi
-  server_command="${nvm_prefix}npm i && npm run dev"
+  server_command="${nvm_prefix}$(pkg_manager) i && $(pkg_manager) run dev"
 fi
 
 # Helper: send a command to a surface in the new workspace

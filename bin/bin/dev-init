@@ -17,6 +17,10 @@ if [ -n "${CMUX_WORKSPACE_ID:-}" ] && [ -z "${TMUX:-}" ]; then
   exec dev-init-cmux "$@"
 fi
 
+pkg_manager() {
+  if command -v pnpm &>/dev/null; then echo "pnpm"; else echo "npm"; fi
+}
+
 WORK_DIR="$(pwd)"
 IN_TMUX=false
 FORCE_SHELL=false
@@ -80,7 +84,7 @@ setup_workflow() {
   # Check if package.json exists and FORCE_SHELL is not set
   if [ -f "$WORK_DIR/package.json" ] && [ "$FORCE_SHELL" = false ]; then
     server_window_name="dev"
-    server_command="${nvm_prefix}npm i && npm run dev"
+    server_command="${nvm_prefix}$(pkg_manager) i && $(pkg_manager) run dev"
   fi
 
   # Create window 2 (Neovim)
