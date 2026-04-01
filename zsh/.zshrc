@@ -92,6 +92,8 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
 # Initialize zoxide (smarter cd command)
+# Exclude git worktree directories from zoxide so they don't pollute search results
+export _ZO_EXCLUDE_DIRS="$HOME/unicity/new-shop-*"
 eval "$(zoxide init zsh)"
 
 # Yazi change directory on exit
@@ -110,6 +112,7 @@ alias multipull="find . -mindepth 1 -maxdepth 1 -type d ! -name '.*' -print -exe
 # alias multi='multimain && multipull'
 alias multi='multipull'
 alias l="eza --icons --group-directories-first --no-filesize"
+alias zhome='for dir in ~/*/; do zoxide add "$dir"; done'
 
 # Tmux attach with auto-create - if no sessions exist, create one
 tmux() {

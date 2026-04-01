@@ -84,10 +84,11 @@ cmux reorder-workspace --workspace "$WS_ID" --index 999
 # Output format: "* surface:14  Terminal 3  [selected]"
 TAB1=$(cmux list-pane-surfaces --workspace "$WS_ID" | grep -oE 'surface:[0-9]+' | head -1)
 
-# Create 2 more tabs
+# Create 2 more tabs (order matters: new surfaces insert after the selected tab,
+# so we create them in reverse order to get: claude | neovim | dev)
 # Output format: "OK surface:15 pane:9 workspace:6"
-TAB2=$(cmux new-surface --workspace "$WS_ID" | grep -oE 'surface:[0-9]+')
 TAB3=$(cmux new-surface --workspace "$WS_ID" | grep -oE 'surface:[0-9]+')
+TAB2=$(cmux new-surface --workspace "$WS_ID" | grep -oE 'surface:[0-9]+')
 
 # Rename tabs
 cmux rename-tab --workspace "$WS_ID" --surface "$TAB1" "claude"
