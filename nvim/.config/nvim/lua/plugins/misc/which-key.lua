@@ -52,6 +52,8 @@ return {              -- Useful plugin to show you pending keybinds.
       { '<leader>t', group = '[T]oggle' },
       { '<leader>h', group = 'Git [H]unk', mode = { 'n', 'v' } },
       { '<leader>f', group = '[F]old' },
+      { ']m', desc = 'Next [M]ark' },
+      { '[m', desc = 'Previous [M]ark' },
     },
   },
 }
