@@ -7,6 +7,7 @@ input=$(cat)
 model=$(echo "$input" | jq -r '.model.display_name // "Unknown Model"')
 used_pct=$(echo "$input" | jq -r '.context_window.used_percentage // empty')
 rate_5h=$(echo "$input" | jq -r '.rate_limits.five_hour.used_percentage // empty')
+rate_resets=$(echo "$input" | jq -r '.rate_limits.five_hour.resets_at // empty')
 
 ESC=$'\033'
 DIM="${ESC}[2m"
@@ -46,7 +47,12 @@ if [ -n "$used_pct" ]; then
     else
       rate_color="${GRN}"
     fi
-    rate_str=" ${sep} ${rate_color}usage ${rate_pct}%${RST}"
+    reset_str=""
+    if [ -n "$rate_resets" ]; then
+      reset_time=$(date -r "$rate_resets" +"%I:%M%p" | tr '[:upper:]' '[:lower:]')
+      reset_str=" resets ${reset_time}"
+    fi
+    rate_str=" ${sep} ${rate_color}usage ${rate_pct}%${DIM}${reset_str}${RST}"
   fi
 
   printf "%s" "${DIM}${model}${RST} ${sep} ${ctx_color}context ${ctx_pct}% ${bar}${RST}${rate_str}"
