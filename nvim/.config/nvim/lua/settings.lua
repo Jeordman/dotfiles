@@ -318,6 +318,16 @@ end
 
 vim.keymap.set('n', '<leader>tl', toggle_large_file_mode, { desc = '[T]oggle [L]arge file mode' })
 
+-- [[ Fast Quit ]]
+-- Stop LSP clients immediately on quit to avoid slow shutdown
+vim.api.nvim_create_autocmd('VimLeavePre', {
+  callback = function()
+    for _, client in ipairs(vim.lsp.get_clients()) do
+      client:stop(true)
+    end
+  end,
+})
+
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
 

@@ -15,6 +15,16 @@ log_step "Installing Development Tools"
 # Neovim
 ensure_package "nvim" "neovim" "Neovim"
 
+# tree-sitter CLI (required by nvim-treesitter main branch to compile parsers)
+# Note: brew 'tree-sitter' is the C library only; the CLI comes from npm
+if ! command -v tree-sitter &> /dev/null; then
+    log_info "Installing tree-sitter CLI..."
+    npm install -g tree-sitter-cli
+    log_success "tree-sitter CLI installed"
+else
+    log_success "tree-sitter CLI already installed"
+fi
+
 # Ripgrep (used by Telescope in neovim)
 ensure_package "rg" "ripgrep" "ripgrep"
 

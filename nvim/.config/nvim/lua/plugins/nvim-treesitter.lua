@@ -1,55 +1,44 @@
 return { -- Highlight, edit, and navigate code
   'nvim-treesitter/nvim-treesitter',
   branch = 'main',
+  lazy = false,
   build = ':TSUpdate',
-  -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
-  opts = {
-    ensure_installed = {
-      'bash',
-      'c',
-      'diff',
-      'html',
-      'lua',
-      'luadoc',
-      'markdown',
-      'markdown_inline',
-      'query',
-      'vim',
-      'vimdoc',
-      'typescript', -- TypeScript files (.ts)
-      'tsx',        -- React/Next.js (.tsx)
-      'javascript', -- JavaScript files (.js)
-      'jsdoc',      -- JSDoc comments
-      'json',       -- package.json, tsconfig.json
-      'css',        -- CSS files
-      'scss',       -- SCSS (if you use it)
-      'php',        -- PHP files
-      'phpdoc',     -- PHPDoc comments
-      'sql',        -- SQL
-      'toml',       -- TOML configuration files
-    },
-    -- Autoinstall languages that are not installed
-    auto_install = true,
-  },
-  config = function(_, opts)
-    require('nvim-treesitter').setup(opts)
+  config = function()
+    local parsers = {
+      'bash', 'c', 'diff', 'html', 'lua', 'luadoc',
+      'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc',
+      'typescript', 'tsx', 'javascript', 'jsdoc',
+      'json', 'css', 'scss', 'php', 'phpdoc', 'sql', 'toml',
+    }
+    require('nvim-treesitter').install(parsers)
 
-    -- Enable treesitter highlighting for all languages except markdown
+    ---@param buf integer
+    ---@param language string
+    local function treesitter_try_attach(buf, language)
+      if not vim.treesitter.language.add(language) then return end
+      if vim.bo[buf].filetype ~= 'markdown' then
+        vim.treesitter.start(buf, language)
+      end
+      vim.bo[buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+    end
+
+    local available_parsers = require('nvim-treesitter').get_available()
+    local installed_parsers = require('nvim-treesitter').get_installed 'parsers'
     vim.api.nvim_create_autocmd('FileType', {
       callback = function(args)
-        local ft = vim.bo[args.buf].filetype
-        if ft ~= 'markdown' then
-          pcall(vim.treesitter.start, args.buf)
-        end
-      end,
-    })
+        local buf, filetype = args.buf, args.match
+        local language = vim.treesitter.language.get_lang(filetype)
+        if not language then return end
 
-    -- Enable treesitter-based indentation (except ruby)
-    vim.api.nvim_create_autocmd('FileType', {
-      callback = function(args)
-        local ft = vim.bo[args.buf].filetype
-        if ft ~= 'ruby' then
-          vim.bo[args.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+        if vim.tbl_contains(installed_parsers, language) then
+          treesitter_try_attach(buf, language)
+        elseif vim.tbl_contains(available_parsers, language) then
+          require('nvim-treesitter').install(language):await(function()
+            table.insert(installed_parsers, language)
+            treesitter_try_attach(buf, language)
+          end)
+        else
+          treesitter_try_attach(buf, language)
         end
       end,
     })
