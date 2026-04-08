@@ -1,0 +1,79 @@
+#!/bin/bash
+set -euo pipefail
+
+# dev-open - Open the current directory in a CMUX workspace
+# Usage: dev-open
+#
+# Creates a workspace named after the current directory with 3 tabs:
+#   Tab 1: Claude Code
+#   Tab 2: Neovim
+#   Tab 3: Dev server or shell
+
+pkg_manager() {
+  if command -v pnpm &>/dev/null; then echo "pnpm"; else echo "npm"; fi
+}
+
+WORK_DIR="$(pwd)"
+SESSION_NAME="$(basename "$WORK_DIR" | sed 's/^new-shop-//')"
+
+if ! command -v cmux &>/dev/null; then
+  echo "Error: cmux not found. Install from https://www.cmux.dev"
+  exit 1
+fi
+
+# Determine dev server command
+server_command=""
+if [ -f "$WORK_DIR/package.json" ]; then
+  server_command="$(pkg_manager) run dev"
+fi
+
+send_cmd() {
+  local surface="$1"
+  local cmd="$2"
+  cmux send --workspace "$WS_ID" --surface "$surface" "$cmd"
+  cmux send-key --workspace "$WS_ID" --surface "$surface" enter
+}
+
+echo "Creating CMUX workspace: $SESSION_NAME"
+WS_ID=$(cmux new-workspace | grep -oE 'workspace:[0-9]+')
+
+cmux rename-workspace --workspace "$WS_ID" "$SESSION_NAME"
+cmux reorder-workspace --workspace "$WS_ID" --index 999
+
+TAB1=$(cmux list-pane-surfaces --workspace "$WS_ID" | grep -oE 'surface:[0-9]+' | head -1)
+TAB3=$(cmux new-surface --workspace "$WS_ID" | grep -oE 'surface:[0-9]+')
+TAB2=$(cmux new-surface --workspace "$WS_ID" | grep -oE 'surface:[0-9]+')
+
+cmux rename-tab --workspace "$WS_ID" --surface "$TAB1" "claude"
+cmux rename-tab --workspace "$WS_ID" --surface "$TAB2" "neovim"
+if [ -n "$server_command" ]; then
+  cmux rename-tab --workspace "$WS_ID" --surface "$TAB3" "dev"
+else
+  cmux rename-tab --workspace "$WS_ID" --surface "$TAB3" "shell"
+fi
+
+echo "Starting Claude in tab 1..."
+send_cmd "$TAB1" "cd $WORK_DIR"
+send_cmd "$TAB1" "claude"
+
+echo "Starting Neovim in tab 2..."
+send_cmd "$TAB2" "cd $WORK_DIR"
+send_cmd "$TAB2" "nvim ."
+
+if [ -n "$server_command" ]; then
+  echo "Starting dev server in tab 3..."
+  send_cmd "$TAB3" "cd $WORK_DIR"
+  send_cmd "$TAB3" "$server_command"
+else
+  echo "Shell ready in tab 3."
+  send_cmd "$TAB3" "cd $WORK_DIR"
+fi
+
+CALLER_SURFACE="${CMUX_SURFACE_ID:-}"
+cmux select-workspace --workspace "$WS_ID"
+
+echo "Workspace ready!"
+
+if [ -n "$CALLER_SURFACE" ]; then
+  cmux close-surface --surface "$CALLER_SURFACE"
+fi

@@ -66,7 +66,7 @@ return { -- code formatter
       typescript = { 'eslint', 'prettier', 'biome' },
       javascriptreact = { 'eslint', 'prettier', 'biome' },
       typescriptreact = { 'eslint', 'prettier', 'biome' },
-      json = { 'prettier', 'biome' },
+      json = { 'prettier', 'biome', 'jq' },
       yaml = { 'prettier' },
       markdown = { 'prettier' },
       css = { 'prettier', 'biome', 'stylelint' },
