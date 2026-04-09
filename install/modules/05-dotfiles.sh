@@ -38,6 +38,7 @@ backup_if_exists() {
 log_info "Checking for existing configurations..."
 backup_if_exists "$HOME/.zshrc"
 backup_if_exists "$HOME/.tmux.conf"
+backup_if_exists "$HOME/.gitconfig"
 backup_if_exists "$HOME/.config/nvim"
 backup_if_exists "$HOME/.config/ghostty"
 backup_if_exists "$HOME/.config/btop"
@@ -47,12 +48,12 @@ backup_if_exists "$HOME/.config/btop"
 log_info "Creating symlinks with GNU Stow..."
 
 if [[ "$DRY_RUN" == "true" ]]; then
-    log_info "[DRY RUN] Would run: stow -R -v bin btop claude ghostty nvim tmux yazi zsh"
+    log_info "[DRY RUN] Would run: stow -R -v bin btop claude ghostty git lazygit nvim tmux yazi zsh"
 else
     # Check which directories exist before stowing
     local stow_targets=()
 
-    for dir in bin btop claude ghostty nvim tmux yazi zsh; do
+    for dir in bin btop claude ghostty git lazygit nvim tmux yazi zsh; do
         if [ -d "$DOTFILES_DIR/$dir" ]; then
             stow_targets+=("$dir")
         else
@@ -80,6 +81,18 @@ fi
 if [ ! -f "$HOME/.p10k.zsh" ] && [ -d "$HOME/.oh-my-zsh/custom/themes/powerlevel10k" ]; then
     log_info "Powerlevel10k theme installed but no .p10k.zsh found"
     log_info "Run 'p10k configure' after opening zsh to set up your prompt"
+fi
+
+# Remind about manual setup steps
+if [ ! -f "$HOME/.gitconfig.local" ]; then
+    log_warning "Missing ~/.gitconfig.local — git commits won't have your name/email"
+    log_info "Create it with:"
+    log_info "  printf '[user]\n\tname = Your Name\n\temail = you@example.com\n' > ~/.gitconfig.local"
+fi
+
+if command -v gh &> /dev/null && ! gh auth status &> /dev/null; then
+    log_warning "GitHub CLI is not authenticated"
+    log_info "Run: gh auth login"
 fi
 
 log_success "Dotfiles setup complete"
