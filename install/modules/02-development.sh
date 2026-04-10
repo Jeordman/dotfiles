@@ -82,4 +82,13 @@ else
     log_success "Claude Code already installed"
 fi
 
+# Codex CLI (OpenAI)
+if ! command -v codex &> /dev/null; then
+    log_info "Installing Codex CLI..."
+    npm install -g @openai/codex
+    log_success "Codex CLI installed"
+else
+    log_success "Codex CLI already installed"
+fi
+
 log_success "Development tools installation complete"

@@ -38,7 +38,6 @@
       "Bash(wget *127.0.0.1*)",
       "Bash(python *)",
       "Bash(python3 *)",
-      "Bash(cd *)",
       "Bash(git status)",
       "Bash(git status *)",
       "Bash(git show *)",
@@ -120,5 +119,6 @@
       }
     }
   },
-  "voiceEnabled": true
+  "voiceEnabled": true,
+  "model": "opus"
 }

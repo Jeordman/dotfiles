@@ -1,0 +1,7 @@
+# Codex CLI global configuration
+model = "gpt-5.4"
+approval_policy = "auto-edit"
+
+# Sandbox enabled — OS-level isolation (macOS seatbelt / Linux containers)
+# Blocks network access and filesystem writes outside the project
+sandbox = true

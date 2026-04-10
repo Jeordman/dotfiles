@@ -40,6 +40,8 @@ backup_if_exists "$HOME/.zshrc"
 backup_if_exists "$HOME/.tmux.conf"
 backup_if_exists "$HOME/.gitconfig"
 backup_if_exists "$HOME/.config/nvim"
+backup_if_exists "$HOME/.codex/config.toml"
+backup_if_exists "$HOME/.codex/AGENTS.md"
 backup_if_exists "$HOME/.config/ghostty"
 backup_if_exists "$HOME/.config/btop"
 
@@ -53,7 +55,7 @@ else
     # Check which directories exist before stowing
     local stow_targets=()
 
-    for dir in bin btop claude ghostty git lazygit nvim tmux yazi zsh; do
+    for dir in bin btop claude codex ghostty git lazygit nvim tmux yazi zsh; do
         if [ -d "$DOTFILES_DIR/$dir" ]; then
             stow_targets+=("$dir")
         else
