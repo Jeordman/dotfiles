@@ -41,6 +41,8 @@
       "Bash(git show *)",
       "Bash(git diff *)",
       "Bash(git log *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr diff *)",
       "Read",
       "Glob",
       "Grep",
