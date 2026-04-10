@@ -107,6 +107,7 @@
       "Bash(rm -rf *)"
     ]
   },
+  "model": "opus",
   "statusLine": {
     "type": "command",
     "command": "bash ~/.claude/statusline-command.sh"
@@ -117,8 +118,16 @@
         "source": "github",
         "repo": "anthropics/skills"
       }
+    },
+    "caveman": {
+      "source": {
+        "source": "github",
+        "repo": "JuliusBrussee/caveman"
+      }
     }
   },
   "voiceEnabled": true,
-  "model": "opus"
+  "enabledPlugins": {
+    "caveman@caveman": true
+  }
 }
