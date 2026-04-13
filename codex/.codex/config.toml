@@ -5,6 +5,10 @@ approval_policy = "on-failure"
 # Sandbox enabled — OS-level isolation (macOS seatbelt / Linux containers)
 # Blocks network access and filesystem writes outside the project
 sandbox = true
+model_reasoning_effort = "high"
 
 [projects."/Users/jeordin.callister/personal/topout"]
 trust_level = "trusted"
+
+[notice.model_migrations]
+"gpt-5.3-codex" = "gpt-5.4"
