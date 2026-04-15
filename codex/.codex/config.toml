@@ -10,5 +10,8 @@ model_reasoning_effort = "high"
 [projects."/Users/jeordin.callister/personal/topout"]
 trust_level = "trusted"
 
+[projects."/Users/jeordin.callister/unicity/new-shop"]
+trust_level = "trusted"
+
 [notice.model_migrations]
 "gpt-5.3-codex" = "gpt-5.4"
