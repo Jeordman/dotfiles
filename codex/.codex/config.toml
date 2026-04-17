@@ -5,12 +5,15 @@ approval_policy = "on-failure"
 # Sandbox enabled — OS-level isolation (macOS seatbelt / Linux containers)
 # Blocks network access and filesystem writes outside the project
 sandbox = true
-model_reasoning_effort = "high"
+model_reasoning_effort = "medium"
 
 [projects."/Users/jeordin.callister/personal/topout"]
 trust_level = "trusted"
 
 [projects."/Users/jeordin.callister/unicity/new-shop"]
+trust_level = "trusted"
+
+[projects."/Users/jeordin.callister/unicity/UFeelGreat"]
 trust_level = "trusted"
 
 [notice.model_migrations]

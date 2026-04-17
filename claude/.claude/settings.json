@@ -107,10 +107,12 @@
       "Bash(rm -rf *)"
     ]
   },
-  "model": "opus",
   "statusLine": {
     "type": "command",
     "command": "bash ~/.claude/statusline-command.sh"
+  },
+  "enabledPlugins": {
+    "caveman@caveman": true
   },
   "extraKnownMarketplaces": {
     "anthropic-agent-skills": {
@@ -126,8 +128,6 @@
       }
     }
   },
-  "voiceEnabled": true,
-  "enabledPlugins": {
-    "caveman@caveman": true
-  }
+  "effortLevel": "xhigh",
+  "voiceEnabled": true
 }

@@ -8,12 +8,43 @@ model=$(echo "$input" | jq -r '.model.display_name // "Unknown Model"')
 used_pct=$(echo "$input" | jq -r '.context_window.used_percentage // empty')
 rate_5h=$(echo "$input" | jq -r '.rate_limits.five_hour.used_percentage // empty')
 rate_resets=$(echo "$input" | jq -r '.rate_limits.five_hour.resets_at // empty')
+cwd=$(echo "$input" | jq -r '.workspace.current_dir // .cwd // empty')
+
+effort=""
+for f in "${cwd}/.claude/settings.local.json" "${cwd}/.claude/settings.json" "${HOME}/.claude/settings.json"; do
+  if [ -n "$f" ] && [ -f "$f" ]; then
+    val=$(jq -r '.effortLevel // empty' "$f" 2>/dev/null)
+    if [ -n "$val" ]; then
+      effort="$val"
+      break
+    fi
+  fi
+done
 
 ESC=$'\033'
 DIM="${ESC}[2m"
 RED="${ESC}[0;31m"
+YLW="${ESC}[0;33m"
 GRN="${ESC}[0;32m"
+CYN="${ESC}[0;36m"
+MAG="${ESC}[0;35m"
+BLU="${ESC}[0;34m"
 RST="${ESC}[0m"
+
+# Claude intelligence-level palette (truecolor, matches Claude UI)
+CC_LOW="${ESC}[38;2;230;160;70m"     # amber
+CC_MED="${ESC}[38;2;120;200;110m"    # green
+CC_HIGH="${ESC}[38;2;150;165;240m"   # periwinkle
+CC_XHIGH="${ESC}[38;2;170;110;245m"  # violet
+CC_MAX="${ESC}[38;2;255;110;95m"     # coral
+
+model_lc=$(echo "$model" | tr '[:upper:]' '[:lower:]')
+case "$model_lc" in
+  *opus*)   model_color="${RED}" ;;
+  *sonnet*) model_color="${BLU}" ;;
+  *haiku*)  model_color="${GRN}" ;;
+  *)        model_color="${DIM}" ;;
+esac
 
 build_bar() {
   local pct="$1"
@@ -55,7 +86,25 @@ if [ -n "$used_pct" ]; then
     rate_str=" ${sep} ${rate_color}usage ${rate_pct}%${DIM}${reset_str}${RST}"
   fi
 
-  printf "%s" "${DIM}${model}${RST} ${sep} ${ctx_color}context ${ctx_pct}% ${bar}${RST}${rate_str}"
+  effort_str=""
+  if [ -n "$effort" ]; then
+    case "$effort" in
+      max)      effort_color="${CC_MAX}" ;;
+      xhigh)    effort_color="${CC_XHIGH}" ;;
+      high)     effort_color="${CC_HIGH}" ;;
+      medium)   effort_color="${CC_MED}" ;;
+      low)      effort_color="${CC_LOW}" ;;
+      none|off) effort_color="${DIM}" ;;
+      *)        effort_color="${DIM}" ;;
+    esac
+    effort_str=" ${sep} ${effort_color}effort ${effort}${RST}"
+  fi
+
+  printf "%s" "${model_color}${model}${RST} ${sep} ${ctx_color}context ${ctx_pct}% ${bar}${RST}${rate_str}${effort_str}"
 else
-  printf "%s" "${DIM}${model}${RST} ${sep} ${DIM}context 0% ░░░░░░░░░░${RST}"
+  effort_str=""
+  if [ -n "$effort" ]; then
+    effort_str=" ${sep} ${DIM}effort ${effort}${RST}"
+  fi
+  printf "%s" "${model_color}${model}${RST} ${sep} ${DIM}context 0% ░░░░░░░░░░${RST}${effort_str}"
 fi
