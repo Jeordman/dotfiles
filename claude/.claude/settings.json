@@ -69,7 +69,11 @@
       "mcp__plugin_playwright_playwright__browser_fill_form",
       "mcp__plugin_playwright_playwright__browser_select_option",
       "mcp__plugin_playwright_playwright__browser_press_key",
-      "mcp__plugin_playwright_playwright__browser_hover"
+      "mcp__plugin_playwright_playwright__browser_hover",
+      "mcp__claude_ai_Cosmic-Dev__list_markets",
+      "mcp__claude_ai_Cosmic-Dev__list_skus",
+      "mcp__claude_ai_Cosmic-Dev__get_product_by_sku",
+      "mcp__claude_ai_Cosmic-Dev__query_products"
     ],
     "deny": [
       "Bash(cat *.env*)",
