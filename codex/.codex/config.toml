@@ -7,6 +7,12 @@ approval_policy = "on-failure"
 sandbox = true
 model_reasoning_effort = "medium"
 
+[sandbox_workspace_write]
+writable_roots = [
+  "/Users/jeordin.callister/personal/topout",
+  "/Users/jeordin.callister/Library/Mobile Documents/iCloud~md~obsidian/Documents/jeordin-vault/topout",
+]
+
 [projects."/Users/jeordin.callister/personal/topout"]
 trust_level = "trusted"
 
@@ -14,6 +20,9 @@ trust_level = "trusted"
 trust_level = "trusted"
 
 [projects."/Users/jeordin.callister/unicity/UFeelGreat"]
+trust_level = "trusted"
+
+[projects."/Users/jeordin.callister/dotfiles"]
 trust_level = "trusted"
 
 [notice.model_migrations]
