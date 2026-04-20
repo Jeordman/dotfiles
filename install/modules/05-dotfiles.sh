@@ -85,6 +85,24 @@ if [ ! -f "$HOME/.p10k.zsh" ] && [ -d "$HOME/.oh-my-zsh/custom/themes/powerlevel
     log_info "Run 'p10k configure' after opening zsh to set up your prompt"
 fi
 
+# Register Codex as an MCP server for Claude Code (user scope, idempotent)
+if command -v claude &> /dev/null && command -v codex &> /dev/null; then
+    if claude mcp get codex &> /dev/null; then
+        log_info "Codex MCP server already registered with Claude Code"
+    elif [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[DRY RUN] Would register codex as MCP server: claude mcp add -s user codex codex mcp-server"
+    else
+        log_info "Registering codex as MCP server for Claude Code..."
+        if claude mcp add -s user codex codex mcp-server &> /dev/null; then
+            log_success "Codex MCP server registered (user scope)"
+        else
+            log_warning "Failed to register codex MCP server — run manually: claude mcp add -s user codex codex mcp-server"
+        fi
+    fi
+elif command -v claude &> /dev/null; then
+    log_warning "Claude Code installed but codex CLI missing — install codex, then run: claude mcp add -s user codex codex mcp-server"
+fi
+
 # Remind about manual setup steps
 if [ ! -f "$HOME/.gitconfig.local" ]; then
     log_warning "Missing ~/.gitconfig.local — git commits won't have your name/email"

@@ -8,6 +8,8 @@ model=$(echo "$input" | jq -r '.model.display_name // "Unknown Model"')
 used_pct=$(echo "$input" | jq -r '.context_window.used_percentage // empty')
 rate_5h=$(echo "$input" | jq -r '.rate_limits.five_hour.used_percentage // empty')
 rate_resets=$(echo "$input" | jq -r '.rate_limits.five_hour.resets_at // empty')
+rate_7d=$(echo "$input" | jq -r '.rate_limits.seven_day.used_percentage // empty')
+rate_7d_resets=$(echo "$input" | jq -r '.rate_limits.seven_day.resets_at // empty')
 cwd=$(echo "$input" | jq -r '.workspace.current_dir // .cwd // empty')
 
 effort=""
@@ -86,6 +88,24 @@ if [ -n "$used_pct" ]; then
     rate_str=" ${sep} ${rate_color}usage ${rate_pct}%${DIM}${reset_str}${RST}"
   fi
 
+  weekly_str=""
+  if [ -n "$rate_7d" ]; then
+    week_pct=$(printf '%.0f' "$rate_7d")
+    if [ "$week_pct" -ge 80 ]; then
+      week_color="${RED}"
+    elif [ "$week_pct" -ge 50 ]; then
+      week_color="${YLW}"
+    else
+      week_color="${GRN}"
+    fi
+    week_reset_str=""
+    if [ -n "$rate_7d_resets" ]; then
+      week_reset_time=$(date -r "$rate_7d_resets" +"%b %d" 2>/dev/null)
+      [ -n "$week_reset_time" ] && week_reset_str=" resets ${week_reset_time}"
+    fi
+    weekly_str=" ${sep} ${week_color}week ${week_pct}%${DIM}${week_reset_str}${RST}"
+  fi
+
   effort_str=""
   if [ -n "$effort" ]; then
     case "$effort" in
@@ -100,7 +120,7 @@ if [ -n "$used_pct" ]; then
     effort_str=" ${sep} ${effort_color}effort ${effort}${RST}"
   fi
 
-  printf "%s" "${model_color}${model}${RST} ${sep} ${ctx_color}context ${ctx_pct}% ${bar}${RST}${rate_str}${effort_str}"
+  printf "%s" "${model_color}${model}${RST} ${sep} ${ctx_color}context ${ctx_pct}% ${bar}${RST}${rate_str}${weekly_str}${effort_str}"
 else
   effort_str=""
   if [ -n "$effort" ]; then
