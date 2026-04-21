@@ -8,8 +8,8 @@ Findings are appended to the plan file under `## Codex gap analysis` so they per
 
 `$ARGUMENTS` — optional path to the plan file.
 
-- If omitted and `~/.claude/plans/` exists, use the most recently modified `*.md` in that directory.
-- Otherwise, look for the most recently modified `*.plan.md` in the current working directory.
+- If omitted, look for the most recently modified `*.md` in (in order) `{cwd}/docs/plans/`, `{cwd}/plans/`, `{cwd}/.claude/plans/`, `{cwd}/specs/`. First match wins.
+- If none of those exist, fall back to the most recently modified `*.plan.md` or `*.md` in the current working directory.
 - If multiple candidates and ambiguous, ask the user which plan to audit before calling Codex.
 
 ## Process

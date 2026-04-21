@@ -126,7 +126,9 @@ Same pattern as Phase 1. Before each `codex-reply` call, announce: `Codex round 
 
 ## Phase 3: Write the combined plan
 
-Write to `~/.claude/plans/{feature_name}.plan.md`. Pick `feature_name` from the prompt (short kebab-case).
+Write to `{cwd}/docs/plans/{feature_name}.md` (repo-local, version-controlled alongside the code). Pick `feature_name` from the prompt (short kebab-case).
+
+Create `docs/plans/` if it does not already exist. If the repo has a different plans convention already in use (e.g., `plans/`, `.claude/plans/`, `specs/`), prefer that existing directory over `docs/plans/`. Never fall back to `~/.claude/plans/` — that's a global dumping ground and invisible to teammates.
 
 Structure:
 
@@ -168,7 +170,7 @@ The `## Codex gap analysis` section is part of the combined plan's value — it 
 Instead:
 
 1. **Print a summary block inline** so the user can read the key decisions without opening the file. Include:
-   - Path to the full plan file (`~/.claude/plans/{feature_name}.plan.md`).
+   - Path to the full plan file (`{cwd}/docs/plans/{feature_name}.md`, or whichever in-repo plans dir was used).
    - Debate stats: rounds run, consensus status (full / partial / tie-broken).
    - 3-6 bullets of the key decisions from the debate (the concrete "we chose X over Y because Z" calls).
    - If there are points of divergence, list them explicitly.
