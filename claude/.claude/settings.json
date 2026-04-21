@@ -52,6 +52,7 @@
       "Write",
       "NotebookEdit",
       "Bash(pnpm *)",
+      "mcp__clickup",
       "mcp__clickup__clickup_search",
       "mcp__clickup__clickup_get_task",
       "mcp__plugin_playwright_playwright__browser_tabs",
@@ -73,7 +74,9 @@
       "mcp__claude_ai_Cosmic-Dev__list_markets",
       "mcp__claude_ai_Cosmic-Dev__list_skus",
       "mcp__claude_ai_Cosmic-Dev__get_product_by_sku",
-      "mcp__claude_ai_Cosmic-Dev__query_products"
+      "mcp__claude_ai_Cosmic-Dev__query_products",
+      "mcp__codex__codex",
+      "mcp__codex__codex-reply"
     ],
     "deny": [
       "Bash(cat *.env*)",
@@ -109,14 +112,18 @@
       "Bash(rm *)",
       "Bash(rm -r *)",
       "Bash(rm -rf *)"
-    ]
+    ],
+    "defaultMode": "auto"
   },
+  "hooks": {},
   "statusLine": {
     "type": "command",
     "command": "bash ~/.claude/statusline-command.sh"
   },
   "enabledPlugins": {
-    "caveman@caveman": true
+    "caveman@caveman": true,
+    "skill-creator@claude-plugins-official": true,
+    "playwright@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "anthropic-agent-skills": {
@@ -133,5 +140,6 @@
     }
   },
   "effortLevel": "xhigh",
-  "voiceEnabled": true
+  "skipAutoPermissionPrompt": true,
+  "voiceEnabled": true,
 }

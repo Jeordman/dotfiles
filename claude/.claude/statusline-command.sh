@@ -12,6 +12,21 @@ rate_7d=$(echo "$input" | jq -r '.rate_limits.seven_day.used_percentage // empty
 rate_7d_resets=$(echo "$input" | jq -r '.rate_limits.seven_day.resets_at // empty')
 cwd=$(echo "$input" | jq -r '.workspace.current_dir // .cwd // empty')
 
+# Cache rate-limit data so other commands (e.g. /debate-plan pre-flight) can
+# read ground-truth usage %. Statusline renders often enough to stay fresh.
+# Best-effort — any failure here must not break the statusline render.
+{
+  cache_file="${HOME}/.claude/usage-cache.json"
+  jq -nc \
+    --arg five_hour_pct "${rate_5h:-}" \
+    --arg five_hour_resets "${rate_resets:-}" \
+    --arg seven_day_pct "${rate_7d:-}" \
+    --arg seven_day_resets "${rate_7d_resets:-}" \
+    --arg updated_at "$(date +%s)" \
+    '{five_hour_pct: $five_hour_pct, five_hour_resets: $five_hour_resets, seven_day_pct: $seven_day_pct, seven_day_resets: $seven_day_resets, updated_at: $updated_at}' \
+    > "${cache_file}.tmp" 2>/dev/null && mv "${cache_file}.tmp" "${cache_file}" 2>/dev/null
+} || true
+
 effort=""
 for f in "${cwd}/.claude/settings.local.json" "${cwd}/.claude/settings.json" "${HOME}/.claude/settings.json"; do
   if [ -n "$f" ] && [ -f "$f" ]; then

@@ -69,7 +69,7 @@ This file is sourced at the end of `.zshrc` (line 150) and should contain:
 
 ## Claude Code Integration
 
-The `claude/` package contains custom slash commands in `claude/.claude/commands/`.
+The `claude/` package contains custom slash commands in `claude/.claude/commands/` and skills in `claude/.claude/skills/`.
 
 When stowed, these become available in Claude Code across all projects.
 
@@ -78,6 +78,21 @@ When stowed, these become available in Claude Code across all projects.
 - A spec defines **what** must always be true, regardless of implementation.
 - Plans can change or be discarded; specs act as the enduring contract.
 - Use specs to guide decisions, enforce correctness, and prevent accidental regressions.
+
+### Agent Orchestration (Claude + Codex)
+
+Codex is registered as an MCP server for Claude Code (see `install/modules/05-dotfiles.sh`). This means Claude can call Codex directly as a tool — no separate terminal tab required.
+
+**The split**:
+- **Claude drives.** It holds the pen for implementation, planning, and explanation.
+- **Codex is consulted.** It's a different model family with different blind spots, used as a second opinion on high-value work.
+
+**When Codex runs** (all explicit — no skill auto-triggers Codex anymore):
+- `/codex-review` — explicit code review of the current diff (dumps Codex output raw, then Claude adds notes).
+- `/codex-plan-review` — explicit gap analysis of a plan file (appends findings to the plan).
+- `/debate-plan` — Claude and Codex each produce an initial plan in parallel, then debate back-and-forth under a Team Lead (main Claude) for up to 3 rounds until consensus, then emit a combined plan. Includes a pre-flight warning if either agent is above 60% of its current usage window.
+
+**Cost discipline**: Codex calls aren't free. All Codex invocation is now explicit via slash command — the user decides when a second opinion is worth it. `/debate-plan` caps at 3 debate rounds (≤4 Codex calls total) and pre-flights usage before firing.
 
 ## Important Reminders
 
