@@ -141,5 +141,5 @@
   },
   "effortLevel": "xhigh",
   "skipAutoPermissionPrompt": true,
-  "voiceEnabled": true,
+  "voiceEnabled": true
 }
