@@ -18,81 +18,13 @@ If omitted, ask the user: "What should Claude and Codex plan together?"
 
 Claude usage comes from `~/.claude/usage-cache.json`, which `statusline-command.sh` writes on every render using the ground-truth `rate_limits` JSON that Claude Code passes in. Codex has no public usage endpoint, so Codex usage is a rough best-effort estimate from `~/.codex/history.jsonl`.
 
-1. Run a bash pre-flight:
+1. Run the pre-flight script:
 
    ```bash
-   echo "=== /debate-plan pre-flight ==="
-
-   # Claude side: read the cache statusline-command.sh maintains.
-   claude_5h="unknown"
-   claude_7d="unknown"
-   cache="${HOME}/.claude/usage-cache.json"
-   if [[ -f "$cache" ]]; then
-     age=$(( $(date +%s) - $(jq -r '.updated_at // 0' "$cache" 2>/dev/null || echo 0) ))
-     if (( age < 600 )); then
-       raw_5h=$(jq -r '.five_hour_pct // ""' "$cache" 2>/dev/null)
-       raw_7d=$(jq -r '.seven_day_pct // ""' "$cache" 2>/dev/null)
-       [[ "$raw_5h" =~ ^[0-9]+(\.[0-9]+)?$ ]] && claude_5h=$(printf '%.0f' "$raw_5h")
-       [[ "$raw_7d" =~ ^[0-9]+(\.[0-9]+)?$ ]] && claude_7d=$(printf '%.0f' "$raw_7d")
-     fi
-   fi
-
-   # Codex side: ground-truth rate_limits from most recent session rollout.
-   # Codex writes rate_limits snapshots into ~/.codex/sessions/**/rollout-*.jsonl
-   # under payload.rate_limits.{primary,secondary}.used_percent. These match
-   # the "Xh limit / Weekly limit" values shown in Codex's own TUI.
-   codex_5h="unknown"
-   codex_7d="unknown"
-   read codex_5h codex_7d < <(python3 <<'PY' 2>/dev/null || echo "unknown unknown"
-   import json, os, glob
-   pattern = os.path.expanduser('~/.codex/sessions/**/rollout-*.jsonl')
-   files = sorted(glob.glob(pattern, recursive=True), key=os.path.getmtime, reverse=True)
-   latest = None
-   for fp in files[:5]:
-       try:
-           with open(fp) as f:
-               for line in f:
-                   try:
-                       entry = json.loads(line)
-                       rl = entry.get('payload', {}).get('rate_limits')
-                       if rl and rl.get('primary'):
-                           ts = entry.get('timestamp', '')
-                           if not latest or ts > latest[0]:
-                               latest = (ts, rl)
-                   except Exception:
-                       pass
-       except Exception:
-           pass
-   if latest:
-       _, rl = latest
-       p = rl.get('primary', {}).get('used_percent', 'unknown')
-       s = rl.get('secondary', {}).get('used_percent', 'unknown')
-       p_out = f"{int(round(float(p)))}" if isinstance(p, (int, float)) else "unknown"
-       s_out = f"{int(round(float(s)))}" if isinstance(s, (int, float)) else "unknown"
-       print(f"{p_out} {s_out}")
-   else:
-       print("unknown unknown")
-   PY
-   )
-
-   echo "Claude 5hr usage: ${claude_5h}%  |  7-day: ${claude_7d}%"
-   echo "Codex  5hr usage: ${codex_5h}%  |  7-day: ${codex_7d}%"
-
-   warn=0
-   for p in "$claude_5h" "$claude_7d" "$codex_5h" "$codex_7d"; do
-     if [[ "$p" =~ ^[0-9]+$ ]] && (( p >= 60 )); then warn=1; fi
-   done
-
-   if (( warn )); then
-     echo ""
-     echo "WARNING: one or more usage metrics above 60% for the current window."
-     echo "/debate-plan may make up to 4 Codex calls + several Claude calls (2-4 min)."
-     echo "Press Ctrl+C within 5s to abort, otherwise continuing..."
-     sleep 5
-   fi
-
-   echo "=== pre-flight done ==="
+   bash ~/.claude/scripts/debate-plan-preflight.sh
    ```
+
+   This script (source at `claude/.claude/scripts/debate-plan-preflight.sh` in the dotfiles repo) reads `~/.claude/usage-cache.json` for Claude's 5hr/7d percentages and scans the 5 most recent `~/.codex/sessions/**/rollout-*.jsonl` files for Codex's `rate_limits.primary/secondary.used_percent`. If any metric is >=60%, it prints a WARNING and sleeps 5s so the user can Ctrl+C. Otherwise it returns immediately. Allowlisted in `settings.json` so it runs without a permission prompt.
 
 2. If the cache is missing or older than 10 minutes, Claude values stay `unknown`. If no Codex session rollout files exist, Codex values stay `unknown`. Do NOT abort on `unknown` — pre-flight is best-effort.
 

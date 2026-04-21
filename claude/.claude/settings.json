@@ -45,6 +45,7 @@
       "Bash(git log *)",
       "Bash(gh pr view *)",
       "Bash(gh pr diff *)",
+      "Bash(bash ~/.claude/scripts/debate-plan-preflight.sh)",
       "Read",
       "Glob",
       "Grep",
