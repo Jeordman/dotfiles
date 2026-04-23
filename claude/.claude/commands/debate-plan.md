@@ -126,9 +126,28 @@ Same pattern as Phase 1. Before each `codex-reply` call, announce: `Codex round 
 
 ## Phase 3: Write the combined plan
 
-Write to `{cwd}/docs/plans/{feature_name}.md` (repo-local, version-controlled alongside the code). Pick `feature_name` from the prompt (short kebab-case).
+**The plan file MUST be written inside the current working directory (`$PWD`) where the user ran `/debate-plan`.** Never anywhere else. The user chose `cwd` deliberately — that's where they want the artifact.
 
-Create `docs/plans/` if it does not already exist. If the repo has a different plans convention already in use (e.g., `plans/`, `.claude/plans/`, `specs/`), prefer that existing directory over `docs/plans/`. Never fall back to `~/.claude/plans/` — that's a global dumping ground and invisible to teammates.
+### Resolving the output path (in order)
+
+1. **Determine `cwd`.** Run `pwd` and use that exact value as the root. Do NOT substitute `~`, `$HOME`, `~/.claude`, or any global directory.
+2. **Pick the plans directory under `cwd`:**
+   - If `{cwd}/docs/plans/` exists → use it.
+   - Else if `{cwd}/plans/` exists → use it.
+   - Else if `{cwd}/specs/` exists → use it.
+   - Else if `{cwd}/.claude/plans/` exists → use it (repo-local, not `~/.claude/plans/`).
+   - Else → create `{cwd}/docs/plans/` (mkdir -p) and use it.
+3. **Write to `{that_dir}/{feature_name}.md`.** `feature_name` = short kebab-case from the prompt.
+
+### Hard bans
+
+- ❌ **Never** write to `~/.claude/plans/`, `$HOME/.claude/plans/`, `/Users/*/.claude/plans/`, or any path outside `cwd`. That directory is a global dumping ground, invisible to teammates, and not what the user wants.
+- ❌ **Never** write to `/tmp`, `/var/folders`, or any path outside the repo.
+- ✅ If `cwd` is itself `~/.claude` or a subdirectory of it (e.g. user is editing the dotfiles repo), that's fine — the rule is "inside `cwd`," not "outside `~/.claude`."
+
+### Self-check before writing
+
+Before calling the Write tool, print one line to the user: `Writing plan to: <absolute path>`. The path MUST start with the `pwd` output. If it does not, stop and re-resolve — something went wrong.
 
 Structure:
 
