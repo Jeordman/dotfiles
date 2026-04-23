@@ -116,6 +116,7 @@
     ],
     "defaultMode": "auto"
   },
+  "enableAllProjectMcpServers": true,
   "hooks": {},
   "statusLine": {
     "type": "command",
