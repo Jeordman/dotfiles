@@ -15,6 +15,9 @@ status_line = [
   "weekly-limit",
 ]
 
+[tui.model_availability_nux]
+"gpt-5.5" = 4
+
 [sandbox_workspace_write]
 writable_roots = [
   "/Users/jeordin.callister/personal/topout",
@@ -34,6 +37,9 @@ trust_level = "trusted"
 trust_level = "trusted"
 
 [projects."/Users/jeordin.callister/unicity"]
+trust_level = "trusted"
+
+[projects."/Users/jeordin.callister/unicity/responsible-ai"]
 trust_level = "trusted"
 
 [notice.model_migrations]
