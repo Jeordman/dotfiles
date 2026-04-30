@@ -1,6 +1,6 @@
 ---
 name: obsidian-vaults
-description: Locates and operates on the user's personal Obsidian markdown notes stored in iCloud. Use this skill ANY time the user references their notes, vaults, daily/weekly notes, todos, meeting notes, or any markdown file that isn't part of the current code project — even casually ("my notes on X", "what did I write about Y", "add this to my todo", "find that climbing log", "the unicity weekly template", "my younique meeting notes"). Also trigger on direct mentions of Obsidian, "the vault", a specific vault name (jeordin-vault, unicity-vault, younique-vault), or filenames like `todo.md`, `Calendar sync.md`, `Weekly Template.md`. Prefer to invoke this skill rather than ask "where are your notes?" — the paths are known.
+description: Locates and operates on the user's personal Obsidian markdown notes stored in iCloud. Use this skill ANY time the user references their notes, vaults, daily/weekly notes, todos, meeting notes, or any markdown file that isn't part of the current code project — even casually ("my notes on X", "what did I write about Y", "add this to my todo", "find that climbing log", "the unicity weekly template"). Also trigger on direct mentions of Obsidian, "the vault", a specific vault name (jeordin-vault, unicity-vault), or filenames like `todo.md`, `Calendar sync.md`, `Weekly Template.md`. Prefer to invoke this skill rather than ask "where are your notes?" — the paths are known. Note: `younique-vault` is legacy/read-only — never write to it and don't route ambiguous notes there; only read it when the user explicitly mentions Younique.
 ---
 
 # Obsidian Vaults
@@ -19,9 +19,9 @@ Each vault is one subdirectory there. **Always use the full absolute path** (wit
 |---|---|---|
 | `jeordin-vault` | `/Users/jeordin.callister/Library/Mobile Documents/iCloud~md~obsidian/Documents/jeordin-vault` | Personal life: climbing (`Climbing/`, `ClimbHarder/`, `topout/`), cooking (`Cooking/`), books (`books/`), coaching (`Coaching/`), personal dev (`Personal/`, `Personal Dev/`), top-level `todo.md`, `Calendar sync.md`. |
 | `unicity-vault` | `/Users/jeordin.callister/Library/Mobile Documents/iCloud~md~obsidian/Documents/unicity-vault` | Unicity work: `docs/`, `people/`, `tasks/`, `subagents/`, `Unicon/`, `Weekly Template.md`, `Shopify Tour.md`. |
-| `younique-vault` | `/Users/jeordin.callister/Library/Mobile Documents/iCloud~md~obsidian/Documents/younique-vault` | Younique work: `APP/`, `Meetings/`, `people/`, `Subs/`, `Task/`, `LEGACY/`. |
+| `younique-vault` | `/Users/jeordin.callister/Library/Mobile Documents/iCloud~md~obsidian/Documents/younique-vault` | **Legacy / read-only.** Younique-era work: `APP/`, `Meetings/`, `people/`, `Subs/`, `Task/`, `LEGACY/`. |
 
-Two work vaults exist (`unicity-vault`, `younique-vault`) because the user works with both organizations. Treat them as separate worlds — never mix notes between them.
+`unicity-vault` is the user's current work vault. `younique-vault` is from a previous role and is **archived** — read it only when the user explicitly says "younique", and **never write to it**. The two work vaults are separate worlds; never mix notes between them.
 
 ## Routing: which vault?
 
