@@ -93,7 +93,7 @@ export NVM_DIR="$HOME/.nvm"
 
 # Initialize zoxide (smarter cd command)
 # Exclude git worktree directories from zoxide so they don't pollute search results
-export _ZO_EXCLUDE_DIRS="$HOME/unicity/new-shop-*"
+export _ZO_EXCLUDE_DIRS="$HOME/unicity/new-shop-*:$HOME/unicity/new-shop-*/**"
 eval "$(zoxide init zsh)"
 
 # Yazi change directory on exit
