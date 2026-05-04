@@ -7,11 +7,10 @@ set -euo pipefail
 #   -s               Force shell (skip dev server even if package.json exists)
 #   -t TICKET        Ticket ID to fetch from ClickUp and start Claude in plan mode
 #
-# Creates a workspace with 4 tabs:
+# Creates a workspace with 3 tabs:
 #   Tab 1: Claude Code
-#   Tab 2: Codex (cc)
-#   Tab 3: Neovim
-#   Tab 4: Dev server or shell
+#   Tab 2: Neovim
+#   Tab 3: Dev server or shell
 
 pkg_manager() {
   if command -v pnpm &>/dev/null; then echo "pnpm"; else echo "npm"; fi
@@ -85,21 +84,19 @@ cmux reorder-workspace --workspace "$WS_ID" --index 999
 # Output format: "* surface:14  Terminal 3  [selected]"
 TAB1=$(cmux list-pane-surfaces --workspace "$WS_ID" | grep -oE 'surface:[0-9]+' | head -1)
 
-# Create 3 more tabs (order matters: new surfaces insert after the selected tab,
-# so we create them in reverse order to get: claude | cc | neovim | dev)
+# Create 2 more tabs (order matters: new surfaces insert after the selected tab,
+# so we create them in reverse order to get: claude | neovim | dev)
 # Output format: "OK surface:15 pane:9 workspace:6"
-TAB4=$(cmux new-surface --workspace "$WS_ID" | grep -oE 'surface:[0-9]+')
 TAB3=$(cmux new-surface --workspace "$WS_ID" | grep -oE 'surface:[0-9]+')
 TAB2=$(cmux new-surface --workspace "$WS_ID" | grep -oE 'surface:[0-9]+')
 
 # Rename tabs
 cmux rename-tab --workspace "$WS_ID" --surface "$TAB1" "claude"
-cmux rename-tab --workspace "$WS_ID" --surface "$TAB2" "codex"
-cmux rename-tab --workspace "$WS_ID" --surface "$TAB3" "neovim"
+cmux rename-tab --workspace "$WS_ID" --surface "$TAB2" "neovim"
 if [ -n "$server_command" ]; then
-  cmux rename-tab --workspace "$WS_ID" --surface "$TAB4" "dev"
+  cmux rename-tab --workspace "$WS_ID" --surface "$TAB3" "dev"
 else
-  cmux rename-tab --workspace "$WS_ID" --surface "$TAB4" "shell"
+  cmux rename-tab --workspace "$WS_ID" --surface "$TAB3" "shell"
 fi
 
 # Build Claude command
@@ -113,21 +110,17 @@ echo "Starting Claude in tab 1..."
 send_cmd "$TAB1" "cd $WORK_DIR"
 send_cmd "$TAB1" "$claude_cmd"
 
-echo "Starting Codex in tab 2..."
+echo "Starting Neovim in tab 2..."
 send_cmd "$TAB2" "cd $WORK_DIR"
-send_cmd "$TAB2" "cc"
-
-echo "Starting Neovim in tab 3..."
-send_cmd "$TAB3" "cd $WORK_DIR"
-send_cmd "$TAB3" "nvim ."
+send_cmd "$TAB2" "nvim ."
 
 if [ -n "$server_command" ]; then
-  echo "Starting dev server in tab 4..."
-  send_cmd "$TAB4" "cd $WORK_DIR"
-  send_cmd "$TAB4" "$server_command"
+  echo "Starting dev server in tab 3..."
+  send_cmd "$TAB3" "cd $WORK_DIR"
+  send_cmd "$TAB3" "$server_command"
 else
-  echo "Shell ready in tab 4."
-  send_cmd "$TAB4" "cd $WORK_DIR"
+  echo "Shell ready in tab 3."
+  send_cmd "$TAB3" "cd $WORK_DIR"
 fi
 
 # Switch to the new workspace and close the launcher terminal
