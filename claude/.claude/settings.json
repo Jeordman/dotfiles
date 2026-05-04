@@ -77,7 +77,12 @@
       "mcp__claude_ai_Cosmic-Dev__get_product_by_sku",
       "mcp__claude_ai_Cosmic-Dev__query_products",
       "mcp__codex__codex",
-      "mcp__codex__codex-reply"
+      "mcp__codex__codex-reply",
+      "Read(//Users/jeordin.callister/Library/Mobile Documents/iCloud~md~obsidian/Documents/**)",
+      "Edit(//Users/jeordin.callister/Library/Mobile Documents/iCloud~md~obsidian/Documents/jeordin-vault/**)",
+      "Edit(//Users/jeordin.callister/Library/Mobile Documents/iCloud~md~obsidian/Documents/unicity-vault/**)",
+      "Write(//Users/jeordin.callister/Library/Mobile Documents/iCloud~md~obsidian/Documents/jeordin-vault/**)",
+      "Write(//Users/jeordin.callister/Library/Mobile Documents/iCloud~md~obsidian/Documents/unicity-vault/**)"
     ],
     "deny": [
       "Bash(cat *.env*)",

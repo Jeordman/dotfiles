@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -e
+
+# gtr.hook.postCreate runs this in each new worktree.
+# Extracts ECOM-<num> from the branch name (if present) and starts the
+# tmux/cmux dev session via dev-init, kicking Claude into plan mode for that
+# ticket. No ticket in branch name -> plain dev-init.
+
+TICKET=$(git branch --show-current 2>/dev/null | grep -oE "ECOM-[0-9]+" | head -1 || true)
+
+if [ -n "$TICKET" ]; then
+    exec dev-init -d . -t "$TICKET"
+else
+    exec dev-init -d .
+fi

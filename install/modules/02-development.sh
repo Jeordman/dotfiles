@@ -44,6 +44,19 @@ ensure_package "lazygit" "lazygit" "lazygit"
 # jq (JSON processor)
 ensure_package "jq" "jq" "jq"
 
+# git-gtr (worktree runner)
+if ! command -v git-gtr &> /dev/null; then
+    if [[ "$OS_TYPE" == "macos" ]] && command -v brew &> /dev/null; then
+        log_info "Installing git-gtr..."
+        brew tap coderabbitai/tap &> /dev/null || true
+        brew install git-gtr && log_success "git-gtr installed"
+    else
+        log_warning "git-gtr install only automated on macOS+brew. See https://github.com/coderabbitai/git-worktree-runner"
+    fi
+else
+    log_success "git-gtr already installed"
+fi
+
 # GitHub CLI
 if [[ "$OS_TYPE" == "macos" ]]; then
     ensure_package "gh" "gh" "GitHub CLI"

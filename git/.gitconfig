@@ -3,3 +3,11 @@
 
 [include]
 	path = ~/.gitconfig.local
+
+[gtr]
+	provider = github
+[gtr "copy"]
+	include = **/.env*
+	exclude = **/.env.example
+[gtr "hook"]
+	postCreate = gtr-postcreate
