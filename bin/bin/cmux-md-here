@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Open a markdown file in the cmux markdown viewer as a sibling tab
+# inside the *caller's* pane (instead of a new side split).
+set -euo pipefail
+
+if [[ $# -lt 1 ]]; then
+  echo "usage: cmux-md-here <path>" >&2
+  exit 2
+fi
+
+path=$(/usr/bin/python3 -c 'import os,sys; print(os.path.abspath(sys.argv[1]))' "$1")
+
+caller_pane=$(cmux identify | jq -r '.caller.pane_ref')
+if [[ -z "$caller_pane" || "$caller_pane" == "null" ]]; then
+  echo "cmux-md-here: could not resolve caller pane" >&2
+  exit 1
+fi
+
+out=$(cmux markdown open "$path" --focus false)
+new_surface=$(printf '%s\n' "$out" | sed -n 's/.*surface=\(surface:[0-9]\{1,\}\).*/\1/p')
+if [[ -z "$new_surface" ]]; then
+  echo "cmux-md-here: could not parse surface from: $out" >&2
+  exit 1
+fi
+
+exec cmux move-surface --surface "$new_surface" --pane "$caller_pane" --focus true

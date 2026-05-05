@@ -5,3 +5,17 @@ show_hidden = true
 [preview]
 max_width = 1800
 max_height = 1800
+
+[opener]
+markdown = [
+  { run = 'if command -v cmux >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 && [ -n "${CMUX_WORKSPACE_ID:-}" ]; then P=$(cmux identify | jq -r .caller.pane_ref); O=$(cmux markdown open %s --focus false); S=$(printf %%s "$O" | sed -n "s/.*surface=\\(surface:[0-9][0-9]*\\).*/\\1/p"); cmux move-surface --surface "$S" --pane "$P" --focus true; else ${EDITOR:-nvim} %s; fi', block = true, desc = "cmux md viewer (or $EDITOR)", for = "unix" },
+  { run = '${EDITOR:-nvim} %s', block = true, desc = "$EDITOR", for = "unix" },
+]
+
+[open]
+prepend_rules = [
+  { url = "*.md",       use = "markdown" },
+  { url = "*.markdown", use = "markdown" },
+  { url = "*.mdx",      use = "markdown" },
+  { url = "*.mkd",      use = "markdown" },
+]
