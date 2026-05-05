@@ -161,6 +161,9 @@ autoload -Uz edit-command-line
 zle -N edit-command-line
 bindkey '^X' edit-command-line
 
+# fzf widgets: ctrl+r (history), ctrl+t (files), alt+c (cd)
+command -v fzf >/dev/null && source <(fzf --zsh)
+
 # Source local configuration for secrets and machine-specific settings (not tracked in git)
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
 

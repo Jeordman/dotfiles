@@ -11,3 +11,5 @@
 	exclude = **/.env.example
 [gtr "hook"]
 	postCreate = gtr-postcreate
+	preRemove = gtr-preremove
+	postRemove = gtr-postremove

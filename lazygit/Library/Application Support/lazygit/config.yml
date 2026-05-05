@@ -1,3 +1,6 @@
 git:
   pull:
     mode: "rebase"
+os:
+  copyToClipboardCmd: 'printf "%s" "{{text}}" | pbcopy'
+  editPreset: 'nvim'

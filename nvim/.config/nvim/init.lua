@@ -1,6 +1,7 @@
 -- NOTE: REMERGED WITH KICKSTART.nvim May 8, 2025 --
 
 require 'settings'
+require 'cmux'
 
 -- [[ Configure and install plugins ]]
 --

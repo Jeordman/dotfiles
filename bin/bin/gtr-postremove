@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# gtr.hook.postRemove — delete the local branch after worktree removal.
+#
+# Always exits 0 — never block subsequent hooks. Runs `git branch -D` so
+# unmerged branches still go (the user explicitly removed the worktree).
+# Skips silently if branch is missing, currently checked out elsewhere,
+# or matches a protected name.
+
+[ -n "$BRANCH" ] || exit 0
+[ -n "$REPO_ROOT" ] || exit 0
+
+case "$BRANCH" in
+  main|master|develop|trunk) exit 0 ;;
+esac
+
+if ! git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$BRANCH"; then
+  exit 0
+fi
+
+if out=$(git -C "$REPO_ROOT" branch -D "$BRANCH" 2>&1); then
+  printf '  → deleted local branch "%s"\n' "$BRANCH"
+else
+  printf '    warn: could not delete branch %s: %s\n' "$BRANCH" "$out"
+fi
+
+exit 0

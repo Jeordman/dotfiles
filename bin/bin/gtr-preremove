@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# gtr.hook.preRemove — close any cmux workspaces rooted in the worktree
+# being removed, so dev servers / claude / nvim die cleanly before files
+# vanish under them.
+#
+# Always exits 0 — never block `git gtr rm` if cmux is down or jq missing.
+# Portable to bash 3.2 (default macOS /bin/bash).
+
+[ -n "$WORKTREE_PATH" ] || exit 0
+command -v cmux >/dev/null 2>&1 || exit 0
+command -v jq   >/dev/null 2>&1 || exit 0
+
+ws_list=$(cmux rpc workspace.list 2>/dev/null) || exit 0
+[ -n "$ws_list" ] || exit 0
+
+current_id=$(cmux rpc workspace.current 2>/dev/null \
+  | jq -r '.workspace.id // empty' 2>/dev/null)
+
+# Match workspaces whose cwd equals WORKTREE_PATH or sits under it.
+# Skip the workspace running this hook to avoid self-kill.
+hits=$(printf '%s\n' "$ws_list" | jq -r \
+  --arg path "$WORKTREE_PATH" \
+  --arg cur "$current_id" '
+    .workspaces[]
+    | select(.current_directory != null)
+    | select(.current_directory == $path
+             or (.current_directory | startswith($path + "/")))
+    | select(.id != $cur)
+    | "\(.id)\t\(.title)"
+  ' 2>/dev/null)
+
+[ -n "$hits" ] || exit 0
+
+while IFS=$'\t' read -r id title; do
+  [ -n "$id" ] || continue
+  printf '  → closing cmux workspace "%s"\n' "$title"
+  cmux rpc workspace.close "{\"workspace_id\":\"$id\"}" >/dev/null 2>&1 \
+    || printf '    warn: failed to close %s\n' "$title"
+done <<< "$hits"
+
+exit 0
