@@ -17,6 +17,15 @@ if ! git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$BRANCH"; then
   exit 0
 fi
 
+# Prompt before deleting when a TTY is available. Set GTR_AUTO_DELETE_BRANCH=1 to skip.
+if [ -z "$GTR_AUTO_DELETE_BRANCH" ] && [ -e /dev/tty ]; then
+  printf '  delete local branch "%s"? [Y/n] ' "$BRANCH" > /dev/tty
+  read -r reply < /dev/tty || reply=""
+  case "$reply" in
+    n|N|no|NO) printf '  → kept branch "%s"\n' "$BRANCH"; exit 0 ;;
+  esac
+fi
+
 if out=$(git -C "$REPO_ROOT" branch -D "$BRANCH" 2>&1); then
   printf '  → deleted local branch "%s"\n' "$BRANCH"
 else
