@@ -4,3 +4,12 @@ git:
 os:
   copyToClipboardCmd: 'printf "%s" "{{text}}" | pbcopy'
   editPreset: 'nvim'
+customCommands:
+  - key: 'o'
+    context: 'commitFiles'
+    command: 'nvim -- {{.SelectedCommitFile.Name | quote}}'
+    output: terminal
+  - key: 'e'
+    context: 'commitFiles'
+    command: 'nvim -- {{.SelectedCommitFile.Name | quote}}'
+    output: terminal
