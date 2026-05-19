@@ -147,7 +147,7 @@
     }
   },
   "effortLevel": "xhigh",
+  "skipDangerousModePermissionPrompt": true,
   "skipAutoPermissionPrompt": true,
-  "voiceEnabled": true,
-  "skipDangerousModePermissionPrompt": true
+  "voiceEnabled": true
 }

@@ -102,7 +102,11 @@ fi
 # Build Claude command
 claude_cmd="claude"
 if [ -n "$TICKET" ]; then
-  claude_cmd="claude --permission-mode plan \"Use the ClickUp MCP to search for task $TICKET. Read the task description and create an implementation plan.\""
+  prompt="Use the ClickUp MCP to search for task $TICKET. Read the task description and create an implementation plan."
+  if [ -f "$WORK_DIR/.claude/skills/planning/SKILL.md" ]; then
+    prompt="/planning $prompt"
+  fi
+  claude_cmd="claude --permission-mode plan \"$prompt\""
 fi
 
 # Send commands to each tab
