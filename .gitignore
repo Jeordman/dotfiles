@@ -1,0 +1,2 @@
+# Machine-specific secrets — never commit. Keep the .example template instead.
+ntfy/.config/ntfy/claude-topic

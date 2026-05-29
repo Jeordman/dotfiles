@@ -50,12 +50,12 @@ backup_if_exists "$HOME/.config/btop"
 log_info "Creating symlinks with GNU Stow..."
 
 if [[ "$DRY_RUN" == "true" ]]; then
-    log_info "[DRY RUN] Would run: stow -R -v bin btop claude ghostty git lazygit nvim tmux yazi zsh"
+    log_info "[DRY RUN] Would run: stow -R -v bin btop claude ghostty git lazygit nvim ntfy tmux yazi zsh"
 else
     # Check which directories exist before stowing
     local stow_targets=()
 
-    for dir in bin btop claude codex ghostty git lazygit nvim tmux yazi zsh; do
+    for dir in bin btop claude codex ghostty git lazygit nvim ntfy tmux yazi zsh; do
         if [ -d "$DOTFILES_DIR/$dir" ]; then
             stow_targets+=("$dir")
         else
@@ -104,6 +104,14 @@ elif command -v claude &> /dev/null; then
 fi
 
 # Remind about manual setup steps
+if [ ! -f "$DOTFILES_DIR/ntfy/.config/ntfy/claude-topic" ]; then
+    log_warning "Missing ntfy/.config/ntfy/claude-topic — Claude Code 'Stop' push notifications are disabled"
+    log_info "Create it (gitignored secret) with an unguessable topic, then restow:"
+    log_info "  echo \"claude-\$(whoami)-\$(openssl rand -hex 4)\" > $DOTFILES_DIR/ntfy/.config/ntfy/claude-topic"
+    log_info "  cd $DOTFILES_DIR && stow -R ntfy"
+    log_info "  Then subscribe the ntfy iOS/Android app to that exact topic on server https://ntfy.sh"
+fi
+
 if [ ! -f "$HOME/.gitconfig.local" ]; then
     log_warning "Missing ~/.gitconfig.local — git commits won't have your name/email"
     log_info "Create it with:"

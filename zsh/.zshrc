@@ -116,6 +116,12 @@ alias multi='multipull'
 alias l="eza --icons --group-directories-first --no-filesize"
 alias zhome='for dir in ~/*/; do zoxide add "$dir"; done'
 
+# ntfy iPhone push when Claude Code finishes (Stop hook). State: ~/.config/ntfy/enabled (missing = on).
+ntfy-on()     { mkdir -p ~/.config/ntfy; print -r -- true  > ~/.config/ntfy/enabled; echo "ntfy notifications: ON"; }
+ntfy-off()    { mkdir -p ~/.config/ntfy; print -r -- false > ~/.config/ntfy/enabled; echo "ntfy notifications: OFF"; }
+ntfy-status() { [[ "$(cat ~/.config/ntfy/enabled 2>/dev/null)" == false ]] && echo "ntfy notifications: OFF" || echo "ntfy notifications: ON"; }
+ntfy-toggle() { [[ "$(cat ~/.config/ntfy/enabled 2>/dev/null)" == false ]] && ntfy-on || ntfy-off; }
+
 # Tmux attach with auto-create - if no sessions exist, create one
 tmux() {
   # Check if the first argument is 'a' or 'attach' or 'attach-session'

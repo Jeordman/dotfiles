@@ -122,7 +122,19 @@
     "defaultMode": "auto"
   },
   "enableAllProjectMcpServers": true,
-  "hooks": {},
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ \"$(cat ~/.config/ntfy/enabled 2>/dev/null)\" = false ] && exit 0; TOPIC=$(cat ~/.config/ntfy/claude-topic 2>/dev/null); [ -n \"$TOPIC\" ] && curl -s -H \"Title: Claude Code\" -H \"Tags: white_check_mark\" -d \"Finished — $(basename \"$PWD\")\" \"https://ntfy.sh/$TOPIC\" >/dev/null 2>&1; true"
+          }
+        ]
+      }
+    ]
+  },
   "statusLine": {
     "type": "command",
     "command": "bash ~/.claude/statusline-command.sh"

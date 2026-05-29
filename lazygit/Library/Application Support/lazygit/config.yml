@@ -1,3 +1,5 @@
+gui:
+  disableStartupPopups: true
 git:
   pull:
     mode: "rebase"
