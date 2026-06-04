@@ -1,11 +1,11 @@
 # Codex CLI global configuration
-model = "gpt-5.4"
+model = "gpt-5.5"
 approval_policy = "on-failure"
 
 # Sandbox enabled — OS-level isolation (macOS seatbelt / Linux containers)
 # Blocks network access and filesystem writes outside the project
 sandbox = true
-model_reasoning_effort = "medium"
+model_reasoning_effort = "xhigh"
 
 [tui]
 status_line = [
@@ -44,6 +44,7 @@ trust_level = "trusted"
 
 [notice.model_migrations]
 "gpt-5.3-codex" = "gpt-5.4"
+"gpt-5.4" = "gpt-5.5"
 
 [mcp_servers.openaiDeveloperDocs]
 url = "https://developers.openai.com/mcp"
