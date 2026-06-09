@@ -106,7 +106,7 @@ function y() {
 }
 
 alias v='nvim'
-alias c='claude'
+alias c='claude --name "${PWD:t}"'  # name remote session after the folder (no random suffix)
 alias cc='codex'
 alias cr='codex exec review --base main --uncommitted'
 alias multipull="find . -mindepth 1 -maxdepth 1 -type d ! -name '.*' -print -exec git -C {} pull \;"
@@ -160,7 +160,11 @@ eval "$(thefuck --alias)"
 # run 'l' to list files after cd
 chpwd() {
   l
+  # Name auto-started Claude Code remote sessions after the current folder/worktree
+  export CLAUDE_REMOTE_CONTROL_SESSION_NAME_PREFIX="${PWD:t}"
 }
+# Seed the prefix for the shell's starting dir (chpwd only fires on cd)
+export CLAUDE_REMOTE_CONTROL_SESSION_NAME_PREFIX="${PWD:t}"
 
 # ctrl-x to edit command line
 autoload -Uz edit-command-line
