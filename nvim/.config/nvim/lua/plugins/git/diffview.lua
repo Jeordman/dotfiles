@@ -5,7 +5,7 @@
 --  Same steps every time:
 --
 --    1. <leader>rr   Open the review   (uncommitted working tree vs HEAD)
---    2. <leader>rc   Open the checklist (map of every changed file + progress)
+--    2. <leader>rc   Open the checklist (current base; press b to switch base)
 --    3. Walk the diff, file by file:
 --         <Tab> / <S-Tab>   next / prev changed file
 --         i                 toggle tree / flat view of the file panel
@@ -16,7 +16,7 @@
 --    5. <leader>rc again → tick off files as you finish them (x / <Space>)
 --    6. <leader>rq   Close the review
 --
---  PICK WHAT YOU'RE REVIEWING (the checklist follows the same base):
+--  PICK WHAT YOU'RE REVIEWING (these open the diff; <leader>rc opens the last base, b switches):
 --    <leader>rr   uncommitted working tree vs HEAD   (about to commit the pile)
 --    <leader>rm   vs main / master   (branch / PR delta — use this if your
 --                                     AI changes are already COMMITTED)
@@ -27,6 +27,7 @@
 --  CHECKLIST KEYS:
 --    x / <Space>  tick reviewed       <CR> / o  open file
 --    h            hide / unhide row   H         reveal hidden rows
+--    b            change base (worktree / staging / main)
 --    q / <Esc>    close
 --    <leader>rx   clear ALL reviewed marks (start fresh; keeps hides)
 --  Select multiple lines in VISUAL mode (V) to act on a range at once:
@@ -53,14 +54,62 @@ local function mode_label(mode)
   })[mode] or mode
 end
 
+-- The three change-sets the checklist can reflect, each tagged with its current
+-- file count so the picker shows where the changes actually are. base_branch()
+-- and changed_files() shell out to git, so build this lazily (per picker open).
+local function base_choices()
+  local choices = {
+    { mode = 'worktree', label = 'Unstaged changes (working tree vs HEAD)' },
+    { mode = 'staging', label = 'This branch vs origin/staging' },
+    { mode = 'main', label = 'This branch vs ' .. rc.base_branch() },
+  }
+  for _, c in ipairs(choices) do
+    c.count = #rc.changed_files(c.mode)
+    c.label = ('%s  (%d)'):format(c.label, c.count)
+  end
+  return choices
+end
+
+-- Prompt for a base, then run on_pick(mode). If nothing has changed in ANY base
+-- there's nothing to review, so just say so. Cancelling the prompt does nothing.
+local function pick_base(on_pick)
+  local choices = base_choices()
+  local has_changes = false
+  for _, c in ipairs(choices) do
+    if c.count > 0 then
+      has_changes = true
+    end
+  end
+  if not has_changes then
+    vim.notify('Review: no changes in any base', vim.log.levels.INFO)
+    return
+  end
+  vim.ui.select(choices, {
+    prompt = 'Review checklist — which changes?',
+    format_item = function(item)
+      return item.label
+    end,
+  }, function(choice)
+    if not choice then
+      return
+    end
+    state.mode = choice.mode -- keep the rest of the review namespace in sync
+    on_pick(choice.mode)
+  end)
+end
+
 -- Floating checklist: a stable map of the whole change + a sense of progress.
-local function open_checklist()
-  local mode = state.mode
+-- `mode` selects the change-set: 'worktree' | 'main' | 'staging'. Forward-declared
+-- so the in-window `b` (change base) handler can reopen it in a different mode.
+local build_checklist
+function build_checklist(mode)
   local label = mode_label(mode)
   local show_hidden = false
 
+  -- Nothing in this base (e.g. your work is committed, so the worktree is clean):
+  -- don't dead-end — open the picker so you can land on a base that has changes.
   if #rc.compute(mode).files == 0 then
-    vim.notify('Review: no changed files (' .. label .. ')', vim.log.levels.INFO)
+    pick_base(build_checklist)
     return
   end
 
@@ -75,6 +124,7 @@ local function open_checklist()
     if res.hidden > 0 then
       status = status .. ('     %d hidden  ·  H to %s'):format(res.hidden, show_hidden and 'collapse' or 'show')
     end
+    status = status .. '     ·  b: change base'
     local lines = { '  Review checklist — ' .. label, status, '' }
     rows = {}
     for _, f in ipairs(res.files) do
@@ -127,6 +177,15 @@ local function open_checklist()
     if vim.api.nvim_win_is_valid(win) then
       vim.api.nvim_win_close(win, true)
     end
+  end
+
+  -- `b`: reopen the checklist against a different base. Pick one and it reopens
+  -- fresh (resized to the new file list); cancel and nothing changes.
+  local function switch_base()
+    pick_base(function(m)
+      close()
+      build_checklist(m)
+    end)
   end
 
   local function restore_cursor(lnum)
@@ -201,6 +260,7 @@ local function open_checklist()
   vim.keymap.set('n', 'H', toggle_show_hidden, opts)
   vim.keymap.set('n', '<CR>', open_file, opts)
   vim.keymap.set('n', 'o', open_file, opts)
+  vim.keymap.set('n', 'b', switch_base, opts)
   vim.keymap.set('n', 'q', close, opts)
   vim.keymap.set('n', '<Esc>', close, opts)
   -- Visual mode: act on every selected row at once.
@@ -208,6 +268,14 @@ local function open_checklist()
   vim.keymap.set('x', '<Space>', function() visual_apply(function(p) rc.set_reviewed_many(p, true) end) end, opts)
   vim.keymap.set('x', 'h', function() visual_apply(function(p) rc.set_hidden_many(p, true) end) end, opts)
   vim.keymap.set('x', 'H', function() visual_apply(function(p) rc.set_hidden_many(p, false) end) end, opts)
+end
+
+-- <leader>rc: open the checklist against the CURRENT base — whatever you last
+-- reviewed ('worktree' on a fresh session). Press `b` inside it to switch base.
+-- If the current base is empty (work already committed), the base picker opens
+-- instead of dead-ending, so you can jump to one that has changes.
+local function open_checklist()
+  build_checklist(state.mode)
 end
 
 local function clear_checklist()
@@ -266,7 +334,7 @@ return {
     { '<leader>rs', review_staging, desc = 'Review vs staging' },
     { '<leader>rh', '<Cmd>DiffviewFileHistory %<CR>', desc = 'Review history of this file' },
     { '<leader>rH', '<Cmd>DiffviewFileHistory<CR>', desc = 'Review history of branch' },
-    { '<leader>rc', open_checklist, desc = 'Review checklist (changed files + progress)' },
+    { '<leader>rc', open_checklist, desc = 'Review checklist (current base; b to switch)' },
     { '<leader>rf', '<Cmd>DiffviewToggleFiles<CR>', desc = 'Review files panel toggle' },
     { '<leader>rx', clear_checklist, desc = 'Review clear all marks' },
     { '<leader>rq', '<Cmd>DiffviewClose<CR>', desc = 'Review quit (close diffview)' },

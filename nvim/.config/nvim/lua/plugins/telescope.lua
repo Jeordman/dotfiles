@@ -68,7 +68,11 @@ return { -- Fuzzy Finder (files, lsp, etc)
       },
       extensions = {
         ['ui-select'] = {
-          require('telescope.themes').get_dropdown(),
+          -- Start vim.ui.select dropdowns (review base picker, gitsigns
+          -- "Diff against", LSP code actions) in NORMAL mode so j/k navigate
+          -- immediately — these are short fixed lists, no need to type-filter.
+          -- File/grep finders are builtin pickers, unaffected (still insert).
+          require('telescope.themes').get_dropdown { initial_mode = 'normal' },
         },
       },
     }
