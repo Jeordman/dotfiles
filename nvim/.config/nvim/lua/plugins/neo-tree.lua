@@ -18,6 +18,9 @@ return {
     require('neo-tree').setup {
       window = {
         position = 'right',
+        width = 40,
+        -- Expand the window so the current file name is fully visible
+        auto_expand_width = true,
         mappings = {
           ['/'] = 'noop',
         },
