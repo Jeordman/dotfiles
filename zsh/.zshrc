@@ -86,10 +86,24 @@ fi
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
-# NVM (Node Version Manager) setup
+# NVM — lazy. Sourcing nvm.sh on every shell costs ~1s because nvm resolves the
+# default `lts/*` alias and runs `nvm use`. Instead: put the newest installed
+# node on PATH directly (so node/npm/npx work instantly, including shebang
+# scripts), and only source the full nvm the first time you actually run `nvm`
+# to switch or install a version.
 export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"        # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+_nvm_bins=("$NVM_DIR"/versions/node/*/bin(N))  # (N) = no error if none installed
+if (( $#_nvm_bins )); then
+  _nvm_bin=$(printf '%s\n' "${_nvm_bins[@]}" | sort -V | tail -1)  # newest version
+  export PATH="$_nvm_bin:$PATH"
+fi
+unset _nvm_bins _nvm_bin
+nvm() {  # first call swaps this stub for the real nvm, then runs your command
+  unset -f nvm
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+  [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+  nvm "$@"
+}
 
 # Initialize zoxide (smarter cd command)
 # Exclude git worktree directories from zoxide so they don't pollute search results

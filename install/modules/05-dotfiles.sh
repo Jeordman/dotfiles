@@ -37,6 +37,7 @@ backup_if_exists() {
 # Backup existing configurations
 log_info "Checking for existing configurations..."
 backup_if_exists "$HOME/.zshrc"
+backup_if_exists "$HOME/.zprofile"
 backup_if_exists "$HOME/.tmux.conf"
 backup_if_exists "$HOME/.gitconfig"
 backup_if_exists "$HOME/.config/nvim"
