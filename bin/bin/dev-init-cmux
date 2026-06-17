@@ -5,7 +5,7 @@ set -euo pipefail
 # Usage: dev-init-cmux [-d DIRECTORY] [-s] [-t TICKET]
 #   -d DIRECTORY     Working directory (default: current directory)
 #   -s               Force shell (skip dev server even if package.json exists)
-#   -t TICKET        Ticket ID to fetch from ClickUp and start Claude in plan mode
+#   -t TICKET        Ticket ID to fetch from ClickUp and start Claude in auto-accept mode
 #
 # Creates a workspace with 3 tabs:
 #   Tab 1: Claude Code
@@ -106,7 +106,7 @@ if [ -n "$TICKET" ]; then
   if [ -f "$WORK_DIR/.claude/skills/planning/SKILL.md" ]; then
     prompt="/planning $prompt"
   fi
-  claude_cmd="claude --permission-mode plan \"$prompt\""
+  claude_cmd="claude --permission-mode acceptEdits \"$prompt\""
 fi
 
 # Send commands to each tab

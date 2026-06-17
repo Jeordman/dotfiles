@@ -7,7 +7,7 @@ set -euo pipefail
 #   -d DIRECTORY     Working directory (default: current directory)
 #   -s               Force shell (skip dev server even if package.json exists)
 #   -k               Keep current window (tmux only, ignored in CMUX)
-#   -t TICKET        Ticket ID to fetch from ClickUp and start Claude in plan mode
+#   -t TICKET        Ticket ID to fetch from ClickUp and start Claude in auto-accept mode
 #
 # Session name is automatically derived from the directory name
 
@@ -103,7 +103,7 @@ setup_workflow() {
     if [ -f "$WORK_DIR/.claude/skills/planning/SKILL.md" ]; then
       prompt="/planning $prompt"
     fi
-    claude_cmd="claude --permission-mode plan \"$prompt\""
+    claude_cmd="claude --permission-mode acceptEdits \"$prompt\""
   fi
 
   # Send commands to each window
