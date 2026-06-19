@@ -58,13 +58,17 @@ else
 fi
 
 # Maestro (mobile UI testing — used by the sim-loop skill for iOS work, e.g. topout app)
+# Requires Temurin JDK (Maestro runs on the JVM)
+if ! brew list --cask temurin &> /dev/null; then
+    log_info "Installing Temurin JDK (required by Maestro)..."
+    brew install --cask temurin && log_success "Temurin installed"
+else
+    log_success "Temurin already installed"
+fi
+# NOTE: do NOT use `brew install maestro` — that installs a music app, not the testing tool
 if ! command -v maestro &> /dev/null; then
-    if [[ "$OS_TYPE" == "macos" ]] && command -v brew &> /dev/null; then
-        log_info "Installing Maestro..."
-        brew install maestro && log_success "Maestro installed"
-    else
-        log_warning "Maestro install only automated on macOS+brew. See https://maestro.mobile.dev/getting-started/installing-maestro"
-    fi
+    log_info "Installing Maestro..."
+    curl -Ls "https://get.maestro.mobile.dev" | bash && log_success "Maestro installed"
 else
     log_success "Maestro already installed"
 fi
