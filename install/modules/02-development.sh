@@ -57,6 +57,18 @@ else
     log_success "git-gtr already installed"
 fi
 
+# Maestro (mobile UI testing — used by the sim-loop skill for iOS work, e.g. topout app)
+if ! command -v maestro &> /dev/null; then
+    if [[ "$OS_TYPE" == "macos" ]] && command -v brew &> /dev/null; then
+        log_info "Installing Maestro..."
+        brew install maestro && log_success "Maestro installed"
+    else
+        log_warning "Maestro install only automated on macOS+brew. See https://maestro.mobile.dev/getting-started/installing-maestro"
+    fi
+else
+    log_success "Maestro already installed"
+fi
+
 # GitHub CLI
 if [[ "$OS_TYPE" == "macos" ]]; then
     ensure_package "gh" "gh" "GitHub CLI"
