@@ -16,6 +16,12 @@ pkg_manager() {
   if command -v pnpm &>/dev/null; then echo "pnpm"; else echo "npm"; fi
 }
 
+# Returns "start" for Expo projects (no "dev" script), "dev" otherwise
+run_script() {
+  node -e "try{const p=require('$1/package.json');process.exit(p.scripts&&p.scripts.dev?0:1)}catch(e){process.exit(1)}" 2>/dev/null \
+    && echo "dev" || echo "start"
+}
+
 WORK_DIR="$(pwd)"
 FORCE_SHELL=false
 TICKET=""
@@ -59,7 +65,7 @@ if [ -f "$WORK_DIR/package.json" ] && [ "$FORCE_SHELL" = false ]; then
   if [[ "$SESSION_NAME" == *"UFeelGreat"* ]] || [[ "$WORK_DIR" == *"UFeelGreat"* ]]; then
     nvm_prefix="nvm use 16 && "
   fi
-  server_command="${nvm_prefix}$(pkg_manager) i && $(pkg_manager) run dev"
+  server_command="${nvm_prefix}$(pkg_manager) i && $(pkg_manager) run $(run_script "$WORK_DIR")"
 fi
 
 # Helper: send a command to a surface in the new workspace
