@@ -18,7 +18,8 @@ if [ -n "${CMUX_WORKSPACE_ID:-}" ] && [ -z "${TMUX:-}" ]; then
 fi
 
 pkg_manager() {
-  if command -v pnpm &>/dev/null; then echo "pnpm"; else echo "npm"; fi
+  if [[ "$WORK_DIR" == */topout* ]]; then echo "npm"; \
+  elif command -v pnpm &>/dev/null; then echo "pnpm"; else echo "npm"; fi
 }
 
 # Returns "start" for Expo projects (no "dev" script), "dev" otherwise
