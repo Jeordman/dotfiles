@@ -1,2 +1,6 @@
 # Machine-specific secrets — never commit. Keep the .example template instead.
 ntfy/.config/ntfy/claude-topic
+
+# Python bytecode (regenerated automatically; e.g. from the nvim-review skill scripts)
+__pycache__/
+*.pyc
