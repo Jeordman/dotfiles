@@ -36,6 +36,7 @@ first if your working directory is elsewhere.
 | Mark all reviewed *except* some | `mark_reviewed.py --check-all-except NAME [NAME...]` |
 | Unmark files | `mark_reviewed.py --uncheck NAME [NAME...]` |
 | Hide files from the list | `mark_reviewed.py --hide NAME [NAME...]` |
+| Hide a whole **category** at once | `mark_reviewed.py --hide '<glob>'` — e.g. `'src/lib/i18n/messages/*.json'` |
 | Bring hidden files back | `mark_reviewed.py --unhide NAME [NAME...]` · `--unhide-all` |
 | Wipe reviewed marks (keeps hides) | `mark_reviewed.py --clear` |
 | Review committed work vs a branch | add `--base origin/main` to any of the above |
@@ -47,9 +48,33 @@ human looking at all"). When the user says "I don't need to review X," default t
 "don't show me", "narrow down"), in which case `--hide`.
 
 `NAME` is loose — a basename (`SubManagerProductLine.tsx`), a path suffix
-(`_components/SubManagerProductLine.tsx`), or a unique substring all work. The script
-resolves each name to exactly one changed file; if a name is ambiguous or matches
-nothing, it stops and prints the candidates so you can retry with a more specific name.
+(`_components/SubManagerProductLine.tsx`), or a unique substring all work. A plain name
+resolves to exactly one changed file; if it's ambiguous or matches nothing, the script
+stops and prints the candidates so you can retry with a more specific name.
+
+A name that contains a glob metacharacter (`*` `?` `[`) is matched as a **glob** and may
+match many files at once — this is the one right way to hide a whole category. The glob
+matches the full path, a path suffix (`'messages/*.json'` catches `a/b/messages/x.json`),
+or the basename. **Single-quote it** so the shell passes it through verbatim.
+
+## Hiding many files: ONE glob, never a long argument list
+
+When the noise is a whole category (all translation JSONs, every snapshot, a generated
+directory), hide it with a **single quoted glob in a single call**:
+
+```
+python3 <skill-dir>/scripts/mark_reviewed.py --hide 'apps/shop/src/lib/i18n/messages/*.json'
+```
+
+Do **not**:
+- build a command line with dozens/hundreds of individual path arguments,
+- pipe paths through `xargs` (it backgrounds/splits unpredictably), or
+- stuff paths into a shell variable (zsh — the user's shell — does **not** word-split
+  unquoted variables, so all paths arrive as one giant argument and the call fails).
+
+All three of those are how this turns into a ten-minute fight. One glob = one fast call.
+If a call doesn't do what you expect, **read the script's error or open the script** — it
+prints exactly what matched and why. Do not retry blind with a new shell trick.
 
 ## How to use it well
 
@@ -85,13 +110,20 @@ Do it with judgment, not pattern-matching:
 1. Run `--json` to get every changed file (with its status and flags).
 2. For files where the *kind* of change is obviously low-risk, look only as much as you
    need to confirm; for anything touching real behavior, keep it visible.
-3. `--hide` the low-value ones, then tell the user what you hid and **why**, grouped
-   (e.g. "Hid 9: lockfile, 4 snapshots, 3 generated API types, 1 pure import reorder").
+3. Hide the low-value ones **by category with a glob, one call per category** (e.g.
+   `--hide '**/__snapshots__/*' '*.snap'`), not by enumerating every file. Then tell the
+   user what you hid and **why**, grouped (e.g. "Hid 9: lockfile, 4 snapshots, 3 generated
+   API types, 1 pure import reorder"). The script prints a per-directory count for big
+   globs, so confirm the count matches what you intended before relaying it.
 
 Typically **safe to hide** (when that's all the change is): lockfiles
 (`package-lock.json`, `yarn.lock`, `Cargo.lock`), generated/compiled output, snapshots
 (`__snapshots__`, `*.snap`), vendored deps, pure formatting / import-reordering, and
-mechanical renames with no logic change.
+mechanical renames with no logic change. **Translation / i18n message files**
+(`src/lib/i18n/messages/*.json` and the like) are this user's most common noise — they're
+machine-synced from an external translation system (Google Sheets), never reviewed as raw
+JSON diffs — so hide the whole `messages/*.json` glob unless the diff changes *keys or
+structure* rather than just translated string values.
 
 **Keep visible** (needs human eyes): business logic, control flow, auth/permissions,
 data handling and migrations, money/pricing math, public API or contract changes, config

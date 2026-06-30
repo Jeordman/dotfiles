@@ -21,15 +21,22 @@ Usage:
     mark_reviewed.py --check-all-except SubManagerDeliveryHero
     mark_reviewed.py --uncheck path/to/file.tsx
     mark_reviewed.py --hide package-lock.json __snapshots__   # narrow the list
+    mark_reviewed.py --hide 'src/lib/i18n/messages/*.json'    # GLOB: a whole category in ONE arg
     mark_reviewed.py --unhide package-lock.json   # or --unhide-all
     mark_reviewed.py --clear
     mark_reviewed.py --base origin/main --list      # review a branch vs main
 
-Names are loose: pass a basename, a path suffix, or a substring. Each must
-resolve to exactly one changed file or the script errors (and lists candidates).
+Names are loose: pass a basename, a path suffix, or a substring. A plain name
+must resolve to exactly one changed file or the script errors (and lists
+candidates). A name containing a glob metacharacter (* ? [) is matched as a
+glob against every changed path and MAY match many — this is how you hide a
+whole category (e.g. all translation JSONs) in a single argument instead of
+listing every file. Always single-quote globs so the shell passes them through
+verbatim rather than expanding them itself.
 """
 
 import argparse
+import fnmatch
 import json
 import os
 import subprocess
@@ -158,16 +165,65 @@ def resolve(name, paths):
     return None, []
 
 
+GLOB_META = ("*", "?", "[")
+
+
+def is_glob(name):
+    return any(c in name for c in GLOB_META)
+
+
+def glob_expand(pat, paths):
+    """Every changed path matching the glob. Matches the full relative path, the
+    path as a suffix (so 'messages/*.json' catches 'a/b/messages/x.json'), or the
+    basename. May match many — that's the point. Errors if it matches nothing."""
+    pat = pat.strip()
+    hits = [p for p in paths
+            if fnmatch.fnmatch(p, pat)
+            or fnmatch.fnmatch(p, "*" + pat)
+            or fnmatch.fnmatch(os.path.basename(p), pat)]
+    if not hits:
+        die(f"No changed file matches glob '{pat}'.\nChanged files:\n  " + "\n  ".join(paths or ["(none)"]))
+    return hits
+
+
+def resolve_one(name, paths):
+    p, cands = resolve(name, paths)
+    if p is None:
+        if cands:
+            die(f"'{name}' is ambiguous — matches:\n  " + "\n  ".join(cands)
+                + "\nPass a longer path, or a quoted glob to hit them all at once.")
+        die(f"No changed file matches '{name}'.\nChanged files:\n  " + "\n  ".join(paths or ["(none)"]))
+    return p
+
+
 def resolve_all(names, paths):
-    out = []
+    """Resolve each NAME to changed paths, deduped and order-preserved. A name
+    with a glob metacharacter expands to all matches; a plain name resolves to
+    exactly one. Pass ONE glob to hide a whole category — never list 100 names."""
+    out, seen = [], set()
     for n in names:
-        p, cands = resolve(n, paths)
-        if p is None:
-            if cands:
-                die(f"'{n}' is ambiguous — matches:\n  " + "\n  ".join(cands) + "\nPass a longer path.")
-            die(f"No changed file matches '{n}'.\nChanged files:\n  " + "\n  ".join(paths or ["(none)"]))
-        out.append(p)
+        for m in (glob_expand(n, paths) if is_glob(n) else [resolve_one(n, paths)]):
+            if m not in seen:
+                seen.add(m)
+                out.append(m)
     return out
+
+
+def fmt_paths(ps):
+    """Compact, verifiable summary of an action's paths — avoids a 100-line wall
+    when a glob hides a big category. Lists paths individually up to 8, then
+    collapses to a per-directory count."""
+    if not ps:
+        return "(nothing)"
+    if len(ps) <= 8:
+        return ", ".join(ps)
+    dirs = {}
+    for p in ps:
+        d = (os.path.dirname(p) or ".") + "/"
+        dirs[d] = dirs.get(d, 0) + 1
+    parts = [(f"{d} (×{c})" if c > 1 else d.rstrip("/")) for d, c in sorted(dirs.items())]
+    shown = "; ".join(parts[:6]) + (" …" if len(parts) > 6 else "")
+    return f"{len(ps)} files — {shown}"
 
 
 def print_list(root, base, as_json, show_all=False):
@@ -264,7 +320,7 @@ def main():
         st["hidden"] = {p: v for p, v in st["hidden"].items() if p in cur}
         save_state(st)
         for verb, ps in actions.items():
-            print(f"{verb}: " + (", ".join(ps) if ps else "(nothing)"))
+            print(f"{verb}: " + fmt_paths(ps))
         print()
 
     print_list(root, args.base, args.json, args.all)
