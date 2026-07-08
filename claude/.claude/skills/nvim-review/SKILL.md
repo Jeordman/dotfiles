@@ -1,6 +1,6 @@
 ---
 name: nvim-review
-description: Build a rich code-review packet for the current branch/PR that lives INSIDE cmux beside nvim — feature-clustered, with a per-feature "how it works" explanation (architecture, data-flow, why — ported from /visual-review's analysis depth), risk banner, and inline-SVG diagrams. It does NOT embed diffs; instead each feature has an "isolate in diffview" button. Served locally and opened in a cmux browser pane, with a bridge so clicks drive your nvim pane: "open" opens a file, "isolate in diffview" opens just that feature's changes in nvim's diffview, and checkboxes sync to the <leader>rc checklist. Use when the user wants to REVIEW a branch/PR and read how it works, then inspect the actual changes in nvim — e.g. "/nvim-review", "review this branch/PR in cmux", "build the review packet", "walk this release feature-by-feature", "review PR #N". The cmux-native, nvim-bridged cousin of /visual-review (which makes a hosted shareable artifact). NOT for ticking files off a checklist (that's review-checklist).
+description: Build a rich code-review packet for the current branch/PR that lives INSIDE cmux beside nvim — feature-clustered, with a per-feature "how it works" explanation (architecture, data-flow, why — ported from /visual-review's analysis depth), risk banner, and full-width component diagrams (flow / branch / before-after / tiles). It does NOT embed diffs; instead each feature has an "isolate in diffview" button. Served locally and opened in a cmux browser pane, with a bridge so clicks drive your nvim pane: "open" opens a file, "isolate in diffview" opens just that feature's changes in nvim's diffview, and checkboxes sync to the <leader>rc checklist. Use when the user wants to REVIEW a branch/PR and read how it works, then inspect the actual changes in nvim — e.g. "/nvim-review", "review this branch/PR in cmux", "build the review packet", "walk this release feature-by-feature", "review PR #N". The cmux-native, nvim-bridged cousin of /visual-review (which makes a hosted shareable artifact). NOT for ticking files off a checklist (that's review-checklist).
 ---
 
 # nvim-review — a review packet inside cmux, wired to nvim
@@ -13,7 +13,7 @@ diffview, in the same cmux window.
 
 Two surfaces, one workspace:
 - **The packet** (cmux browser tab) — risk banner, feature clustering, per-feature
-  *how-it-works* (architecture / data-flow / why) + review-focus, inline-SVG diagrams.
+  *how-it-works* (architecture / data-flow / why) + review-focus, full-width component diagrams.
 - **The bridge** (a local server cmux talks to) — every click spawns its OWN new full-screen
   nvim tab, in the **background** (`--focus false`) and in the review's workspace, so it never
   pulls you away from what you're doing (no existing nvim pane is touched or even needed):
@@ -138,8 +138,8 @@ buttons copy the ex-commands to paste into nvim (`:` then `Ctrl-r +` `↵`).
       "name": "Pricing pipeline",
       "risk": "High",                            // High|Medium|Low (default Medium)
       "goal": "one sentence",
-      "how_it_works": "<p>Raw HTML — explain the mechanism…</p>",   // the explanation block
-      "diagram_html": "<svg …>…</svg>",           // optional standalone diagram
+      "how_it_works": "<p>…</p><div class=\"band\">…components…</div>",  // explanation + full-width visual (see kit below)
+      "diagram_html": "<div class=\"band\">…</div>",  // optional extra standalone visual (component markup or SVG)
       "review_focus": ["most likely wrong thing", "…"],            // ≤5
       "paths":  ["literal/path/[alpha3]/File.tsx"],                // LITERAL (bracket-safe)
       "globs":  ["apps/shop/src/lib/pricing/**"]                   // fnmatch category sweeps
@@ -156,25 +156,83 @@ has real behavior MUST have a `how_it_works` that:
 
 1. is **grounded in actually reading the code** (Step 2's "read high-signal files") — name the
    real functions/modules and what they do, not vague summaries; and
-2. includes a **diagram (inline SVG)** whenever the cluster has a data flow, pipeline, request
-   path, or cooperating modules — which most do. Diagram the flow the way `/visual-review`
-   would: boxes + arrows showing how data moves, with the key decision points labeled. A
-   before/after for a refactor; a node graph for a blast radius. Reach for the diagram first;
-   prose fills the gaps the picture can't.
+2. **leads with a full-width diagram** whenever the cluster has a data flow, pipeline, request
+   path, decision/dispatch, refactor, or cooperating modules — which most do. **Reach for the
+   picture first; prose fills only the gaps it can't.** A pipeline for a request path; a
+   *branch* for a dispatch/decision; before/after for a refactor; tiles for magnitudes.
 
-Raw HTML injected verbatim; keep it self-contained (no CDN, no external anything). Pick the
-clearest form per the data:
+### The visual component library — assemble these, don't hand-roll raw SVG
 
-| The thing is… | Use |
-| --- | --- |
-| A data-flow / pipeline / blast radius | inline `<svg>` boxes + arrows |
-| A refactor's shape change | two columns: `<div class="cols"><div><div class="lbl">before</div>…</div><div><div class="lbl">after</div>…</div></div>` |
-| The mechanism / why it broke / why this fixes it | tight `<p>` prose; wrap symbols in `<code>` or `<span class="path">` |
+The shell ships a self-contained CSS component kit. **Build diagrams by composing these
+classes** — they auto-size, always fill the width, stay on-palette, and never overflow or
+misalign the way hand-placed `<svg>` coordinates do. **Wrap every diagram in `<div class="band">`
+so it spans the full card width** — that is the default; a bare component sits cramped in the
+text column and is the #1 thing that made old packets look thin. Color semantics are shared
+across every component: **`hi` = amber = new/changed** · **`lo` = green = unchanged/safe** ·
+**`teal` = entry point / primary** · **`mute` = grey = neutral / out of scope**.
 
-Available styling inside `how_it_works`: `<p>`, `<b>`, `<code>`/`<span class="path">`,
-`<div class="cols">`+`.lbl` (two-column before/after), and inline `<svg>` (palette: teal
-`#15616d`, amber `#9a6312`, slate `#4f5d75`; system mono font). Keep it terse — a diagram
-beats a paragraph; a paragraph beats nothing; skip it for a linear one-line change.
+**Full-width band** (the wrapper for any visual):
+```html
+<div class="band"><p class="cap">short label</p> …component… </div>
+```
+
+**flow** — a horizontal pipeline (auto-arrowed; add `col` for vertical). The workhorse for a
+request/data path:
+```html
+<div class="flow">
+  <div class="node"><div class="t">cart items</div></div>
+  <div class="node teal"><div class="t">build body</div><div class="s">Autoship vs Order</div></div>
+  <div class="node hi"><div class="t">POST /quotes</div><div class="s">proForma | public</div></div>
+  <div class="node lo"><div class="t">safeParse</div><div class="s">never throws</div></div>
+</div>
+```
+
+**branch** — one head node fanning out to N children (a dispatch / `switch` / "which path").
+A child can carry a follow-on node via `kidcol`; tag the changed one with `<div class="tag">new</div>`:
+```html
+<div class="branch">
+  <div class="node teal"><div class="t">Dispatcher</div></div>
+  <p class="q">which branch?</p>
+  <div class="kids">
+    <div class="node mute"><div class="t">caseA</div><div class="s">unchanged</div></div>
+    <div class="node lo"><div class="t">caseB</div><div class="s">existing</div></div>
+    <div class="kidcol">
+      <div class="node hi"><div class="tag">new</div><div class="t">default</div><div class="s">disclosure added here</div></div>
+      <div class="node hi"><div class="t">renders when</div><div class="s">isSubscription &amp;&amp; key present</div></div>
+    </div>
+  </div>
+</div>
+```
+
+**cols** — before/after (add `c3` for three columns). `.lbl before` / `.lbl after` prepend −/+:
+```html
+<div class="cols">
+  <div><div class="lbl before">before</div>7 call sites, 3 retry policies.</div>
+  <div><div class="lbl after">after</div>One middleware; routes assume a valid token.</div>
+</div>
+```
+
+**tiles** — stat/magnitude row (`hi`/`lo`/`teal` accents): `<div class="tiles"><div class="tile teal"><div class="num">2</div><div class="cap">variants</div></div>…</div>`
+
+**steps** — an ordered process: `<ol class="steps"><li><span class="st">Intercept</span> — reads the token.</li>…</ol>`
+
+**callout** — a highlighted note (`warn`/`danger`/`ok`, default neutral). Ideal for a blast-radius
+line: `<div class="callout warn"><span class="h">Blast radius:</span> runs on every proxied call.</div>`
+
+**legend** — swatches under a diagram: `<div class="legend"><span><i class="hi"></i> changed</span><span><i class="lo"></i> unchanged</span></div>`
+
+**Inline**, inside prose: `<code>`/`<span class="path">` for symbols & paths, `<b>` for emphasis.
+
+**SVG is the escape hatch — only for arbitrary graphs the components above can't express**
+(dense node-link / blast-radius webs, non-linear topologies). When you do reach for it: give
+the `<svg>` a `viewBox` about **1080 wide** and **no `width`/`height` attributes** (it fills
+the width automatically), and style elements with the shared classes so it matches everything
+else — `dg-node` (+`hi`/`lo`/`teal`) on `<rect>`, `dg-t` (title) / `dg-s` (sub) on `<text>`,
+`dg-edge` on connector `<path>` (add an arrowhead `<marker>`). Never set fonts/colors inline.
+
+Everything is injected verbatim and must stay self-contained (no CDN, no external anything).
+Keep it terse — one strong full-width diagram beats three paragraphs; skip the visual only for
+a genuinely linear one-line change.
 
 **`paths` vs `globs`:** exact files go in `paths` (always literal — bracket-safe); `globs`
 (fnmatch over the change set) fold whole categories in one entry. First cluster to claim a
