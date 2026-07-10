@@ -1,18 +1,18 @@
-# Codex CLI global configuration
 model = "gpt-5.5"
 approval_policy = "on-failure"
-
-# Sandbox enabled — OS-level isolation (macOS seatbelt / Linux containers)
-# Blocks network access and filesystem writes outside the project
 sandbox = true
 model_reasoning_effort = "xhigh"
+notify = [
+    "/Users/jeordin.callister/.codex/computer-use/Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.app/Contents/MacOS/SkyComputerUseClient",
+    "turn-ended",
+]
 
 [tui]
 status_line = [
-  "model-with-reasoning",
-  "context-used",
-  "five-hour-limit",
-  "weekly-limit",
+    "model-with-reasoning",
+    "context-used",
+    "five-hour-limit",
+    "weekly-limit",
 ]
 
 [tui.model_availability_nux]
@@ -20,8 +20,8 @@ status_line = [
 
 [sandbox_workspace_write]
 writable_roots = [
-  "/Users/jeordin.callister/personal/topout",
-  "/Users/jeordin.callister/Library/Mobile Documents/iCloud~md~obsidian/Documents/jeordin-vault/topout",
+    "/Users/jeordin.callister/personal/topout",
+    "/Users/jeordin.callister/Library/Mobile Documents/iCloud~md~obsidian/Documents/jeordin-vault/topout",
 ]
 
 [projects."/Users/jeordin.callister/personal/topout"]
@@ -51,3 +51,81 @@ trust_level = "trusted"
 
 [mcp_servers.openaiDeveloperDocs]
 url = "https://developers.openai.com/mcp"
+
+[mcp_servers.node_repl]
+args = []
+command = "/Applications/Codex.app/Contents/Resources/cua_node/bin/node_repl"
+startup_timeout_sec = 120
+
+[mcp_servers.node_repl.env]
+NODE_REPL_NATIVE_PIPE_CONNECT_TIMEOUT_MS = "1000"
+NODE_REPL_NODE_MODULE_DIRS = "/Applications/Codex.app/Contents/Resources/cua_node/lib/node_modules"
+NODE_REPL_NODE_PATH = "/Applications/Codex.app/Contents/Resources/cua_node/bin/node"
+NODE_REPL_TRUSTED_CODE_PATHS = "/Users/jeordin.callister/.codex"
+CODEX_HOME = "/Users/jeordin.callister/.codex"
+NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "97669f77b3ca7114a2df05d55646416ea34b28100c07213ef9f643803449ef2f"
+BROWSER_USE_AVAILABLE_BACKENDS = "chrome,iab"
+NODE_REPL_INSTRUCTIONS_USE_CASE_BROWSER = "Control the in-app browser in conjunction with the Browser Plugin."
+NODE_REPL_INSTRUCTIONS_USE_CASE_CHROME = "Control the Chrome browser in conjunction with the Chrome Plugin. Prefer this method of controlling Chrome over alternatives (such as Computer Use) unless the user explicitly mentions an alternative."
+BROWSER_USE_CODEX_APP_BUILD_FLAVOR = "prod"
+BROWSER_USE_CODEX_APP_VERSION = "26.623.141536"
+CODEX_CLI_PATH = "/Applications/Codex.app/Contents/Resources/codex"
+
+[mcp_servers.clickup]
+url = "https://mcp.clickup.com/mcp"
+
+[mcp_servers.codex]
+command = "codex"
+args = ["mcp-server"]
+
+[mcp_servers.playwright]
+command = "npx"
+args = ["@playwright/mcp@latest"]
+
+[marketplaces.openai-bundled]
+last_updated = "2026-07-09T17:36:26Z"
+source_type = "local"
+source = "/Users/jeordin.callister/.codex/.tmp/bundled-marketplaces/openai-bundled"
+
+[marketplaces.claude-plugins-official]
+last_updated = "2026-07-09T17:37:00Z"
+source_type = "git"
+source = "https://github.com/anthropics/claude-plugins-official.git"
+
+[marketplaces.openai-primary-runtime]
+last_updated = "2026-07-09T17:37:12Z"
+source_type = "local"
+source = "/Users/jeordin.callister/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
+
+[plugins."sites@openai-bundled"]
+enabled = true
+
+[plugins."browser@openai-bundled"]
+enabled = true
+
+[plugins."playwright@claude-plugins-official"]
+enabled = true
+
+[plugins."skill-creator@claude-plugins-official"]
+enabled = true
+
+[plugins."code-review@claude-plugins-official"]
+enabled = true
+
+[plugins."documents@openai-primary-runtime"]
+enabled = true
+
+[plugins."pdf@openai-primary-runtime"]
+enabled = true
+
+[plugins."spreadsheets@openai-primary-runtime"]
+enabled = true
+
+[plugins."presentations@openai-primary-runtime"]
+enabled = true
+
+[plugins."template-creator@openai-primary-runtime"]
+enabled = true
+
+[features]
+js_repl = false
