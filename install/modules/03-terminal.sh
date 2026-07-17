@@ -85,6 +85,9 @@ fi
 # zoxide (smart cd)
 ensure_package "zoxide" "zoxide" "zoxide"
 
+# direnv (per-directory env via .envrc; e.g. per-folder CLAUDE_CONFIG_DIR)
+ensure_package "direnv" "direnv" "direnv"
+
 # delta (better git diff)
 if [[ "$OS_TYPE" == "macos" ]]; then
     ensure_package "delta" "git-delta" "delta"

@@ -80,6 +80,42 @@ else
     fi
 fi
 
+# Share curated Claude config with the per-directory "personal" account.
+# ~/.claude-personal is the config dir used when CLAUDE_CONFIG_DIR points at it
+# (see ~/personal/.envrc and docs/direnv.md). It reuses the SAME dotfiles sources
+# as ~/.claude, so both accounts share skills/commands/hooks/scripts/settings/
+# statusline. Login and MCP servers stay separate per account by design.
+link_personal_claude_config() {
+    local src="$DOTFILES_DIR/claude/.claude"
+    local dst="$HOME/.claude-personal"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[DRY RUN] Would link shared Claude config into $dst"
+        return 0
+    fi
+
+    mkdir -p "$dst"
+
+    local item backup_timestamp
+    for item in skills commands hooks scripts settings.json statusline-command.sh; do
+        # Back up a real (non-symlink) file/dir that would collide
+        if [ -e "$dst/$item" ] && [ ! -L "$dst/$item" ]; then
+            backup_timestamp=$(date +%Y%m%d_%H%M%S)
+            mv "$dst/$item" "$dst/$item.backup.$backup_timestamp"
+        fi
+        ln -sfn "$src/$item" "$dst/$item"
+    done
+
+    # agents are local (not in dotfiles) — share the main account's set if present
+    if [ -d "$HOME/.claude/agents" ]; then
+        ln -sfn "$HOME/.claude/agents" "$dst/agents"
+    fi
+
+    log_success "Shared Claude config linked into ~/.claude-personal (personal account)"
+}
+
+link_personal_claude_config
+
 # Create .p10k.zsh if it doesn't exist (Powerlevel10k config)
 if [ ! -f "$HOME/.p10k.zsh" ] && [ -d "$HOME/.oh-my-zsh/custom/themes/powerlevel10k" ]; then
     log_info "Powerlevel10k theme installed but no .p10k.zsh found"

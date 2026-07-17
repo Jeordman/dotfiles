@@ -106,8 +106,12 @@ nvm() {  # first call swaps this stub for the real nvm, then runs your command
 }
 
 # Initialize zoxide (smarter cd command)
-# Exclude git worktree directories from zoxide so they don't pollute search results
-export _ZO_EXCLUDE_DIRS="$HOME/unicity/new-shop-*:$HOME/unicity/new-shop-*/**"
+# Exclude git worktree directories from zoxide so they don't pollute search results.
+# Convention: worktree parent folders always end in "-worktrees" (new-shop-worktrees,
+# UFeelGreat-worktrees, dotfiles-worktrees, ...). This matches any such folder anywhere under
+# $HOME and everything inside it, so new ones are ignored automatically without being listed.
+# Real repos (new-shop, global-cms, UFeelGreat, ...) are unaffected.
+export _ZO_EXCLUDE_DIRS="$HOME/**/*-worktrees:$HOME/**/*-worktrees/**"
 eval "$(zoxide init zsh)"
 
 # Yazi change directory on exit
@@ -201,3 +205,7 @@ case ":$PATH:" in
 esac
 # pnpm end
 export PATH=$PATH:$HOME/.maestro/bin
+
+# direnv — loads/unloads per-directory env (.envrc) on cd. Keep near the end.
+# Guarded so shells don't error on machines where direnv isn't installed yet.
+command -v direnv >/dev/null && eval "$(direnv hook zsh)"
