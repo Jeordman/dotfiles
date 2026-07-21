@@ -2,10 +2,13 @@
 set -euo pipefail
 
 # dev-init-cmux - Initialize a CMUX workflow with Claude, Neovim, and dev server
-# Usage: dev-init-cmux [-d DIRECTORY] [-s] [-t TICKET]
+# Usage: dev-init-cmux [-d DIRECTORY] [-s] [-t TICKET] [-f]
 #   -d DIRECTORY     Working directory (default: current directory)
 #   -s               Force shell (skip dev server even if package.json exists)
 #   -t TICKET        Ticket ID to fetch from ClickUp and start Claude in auto-accept mode
+#   -f               Foreground: switch to the new workspace and close the launcher
+#                    terminal. Default is background — the workspace is built without
+#                    stealing focus, so you stay where you are (it appears in the sidebar).
 #
 # Creates a workspace with 3 tabs:
 #   Tab 1: Claude Code
@@ -26,14 +29,16 @@ run_script() {
 WORK_DIR="$(pwd)"
 FORCE_SHELL=false
 TICKET=""
+FOREGROUND=false
 
 # Parse arguments
-while getopts "d:st:" opt; do
+while getopts "d:st:f" opt; do
   case $opt in
     d) WORK_DIR="$OPTARG" ;;
     s) FORCE_SHELL=true ;;
     t) TICKET="$OPTARG" ;;
-    *) echo "Usage: $0 [-d DIRECTORY] [-s] [-t TICKET]"; exit 1 ;;
+    f) FOREGROUND=true ;;
+    *) echo "Usage: $0 [-d DIRECTORY] [-s] [-t TICKET] [-f]"; exit 1 ;;
   esac
 done
 
@@ -77,9 +82,13 @@ send_cmd() {
   cmux send-key --workspace "$WS_ID" --surface "$surface" enter
 }
 
-# Create a new workspace
+# Create a new workspace. Build it in the background (--focus false) unless
+# the caller asked to jump straight to it with -f.
+NEW_FOCUS_FLAG="--focus false"
+[ "$FOREGROUND" = true ] && NEW_FOCUS_FLAG="--focus true"
+
 echo "Creating CMUX workspace: $SESSION_NAME"
-WS_ID=$(cmux new-workspace | grep -oE 'workspace:[0-9]+')
+WS_ID=$(cmux new-workspace $NEW_FOCUS_FLAG | grep -oE 'workspace:[0-9]+')
 
 # Rename the workspace in the sidebar
 cmux rename-workspace --workspace "$WS_ID" "$SESSION_NAME"
@@ -94,8 +103,9 @@ TAB1=$(cmux list-pane-surfaces --workspace "$WS_ID" | grep -oE 'surface:[0-9]+' 
 # Create 2 more tabs (order matters: new surfaces insert after the selected tab,
 # so we create them in reverse order to get: claude | neovim | dev)
 # Output format: "OK surface:15 pane:9 workspace:6"
-TAB3=$(cmux new-surface --workspace "$WS_ID" | grep -oE 'surface:[0-9]+')
-TAB2=$(cmux new-surface --workspace "$WS_ID" | grep -oE 'surface:[0-9]+')
+# --focus false so building the tabs doesn't yank the screen to this workspace.
+TAB3=$(cmux new-surface --workspace "$WS_ID" $NEW_FOCUS_FLAG | grep -oE 'surface:[0-9]+')
+TAB2=$(cmux new-surface --workspace "$WS_ID" $NEW_FOCUS_FLAG | grep -oE 'surface:[0-9]+')
 
 # Rename tabs
 cmux rename-tab --workspace "$WS_ID" --surface "$TAB1" "claude"
@@ -134,12 +144,17 @@ else
   send_cmd "$TAB3" "cd $WORK_DIR"
 fi
 
-# Switch to the new workspace and close the launcher terminal
 CALLER_SURFACE="${CMUX_SURFACE_ID:-}"
-cmux select-workspace --workspace "$WS_ID"
 
-echo "Workspace ready!"
-
-if [ -n "$CALLER_SURFACE" ]; then
-  cmux close-surface --surface "$CALLER_SURFACE"
+if [ "$FOREGROUND" = true ]; then
+  # Switch to the new workspace and close the launcher terminal.
+  cmux select-workspace --workspace "$WS_ID"
+  echo "Workspace ready!"
+  if [ -n "$CALLER_SURFACE" ]; then
+    cmux close-surface --surface "$CALLER_SURFACE"
+  fi
+else
+  # Background: leave focus where it is. The workspace sits in the sidebar,
+  # ready to click into whenever you want it. Don't close the launcher terminal.
+  echo "Workspace '$SESSION_NAME' ready in the background (see the sidebar)."
 fi

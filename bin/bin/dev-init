@@ -3,11 +3,13 @@ set -euo pipefail
 
 # dev-init - Initialize a workflow with Claude, Neovim, and dev server
 # Auto-detects tmux vs CMUX and dispatches accordingly.
-# Usage: dev-init [-d DIRECTORY] [-s] [-k] [-t TICKET]
+# Usage: dev-init [-d DIRECTORY] [-s] [-k] [-t TICKET] [-f]
 #   -d DIRECTORY     Working directory (default: current directory)
 #   -s               Force shell (skip dev server even if package.json exists)
 #   -k               Keep current window (tmux only, ignored in CMUX)
 #   -t TICKET        Ticket ID to fetch from ClickUp and start Claude in auto-accept mode
+#   -f               Foreground the new CMUX workspace (cmux only; ignored in tmux).
+#                    Default in CMUX is background — build it without stealing focus.
 #
 # Session name is automatically derived from the directory name
 
@@ -40,13 +42,14 @@ if [ -n "${TMUX:-}" ]; then
 fi
 
 # Parse arguments
-while getopts "d:skt:" opt; do
+while getopts "d:skt:f" opt; do
   case $opt in
     d) WORK_DIR="$OPTARG" ;;
     s) FORCE_SHELL=true ;;
     k) KEEP_WINDOW=true ;;
     t) TICKET="$OPTARG" ;;
-    *) echo "Usage: $0 [-d DIRECTORY] [-s] [-k] [-t TICKET]"; exit 1 ;;
+    f) ;;  # cmux-only foreground flag; no-op in the tmux path (forwarded before parsing)
+    *) echo "Usage: $0 [-d DIRECTORY] [-s] [-k] [-t TICKET] [-f]"; exit 1 ;;
   esac
 done
 
