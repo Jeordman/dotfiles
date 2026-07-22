@@ -117,6 +117,9 @@ run_interactive_installation() {
         if ask_yes_no "Configure macOS keyboard settings?"; then
             run_module "04-macos.sh"
         fi
+        if ask_yes_no "Configure always-on power settings (for remote access)?" "n"; then
+            run_module "06-power.sh"
+        fi
     fi
 
     if ask_yes_no "Link dotfiles using GNU Stow?"; then
@@ -147,6 +150,7 @@ main() {
         run_module "03-terminal.sh"
         if [[ "$OS_TYPE" == "macos" ]]; then
             run_module "04-macos.sh"
+            run_module "06-power.sh"
         fi
         run_module "05-dotfiles.sh"
 

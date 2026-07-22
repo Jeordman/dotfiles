@@ -102,7 +102,7 @@ source_type = "git"
 source = "https://github.com/anthropics/claude-plugins-official.git"
 
 [marketplaces.openai-primary-runtime]
-last_updated = "2026-07-09T17:37:12Z"
+last_updated = "2026-07-21T15:20:41Z"
 source_type = "local"
 source = "/Users/jeordin.callister/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
 
