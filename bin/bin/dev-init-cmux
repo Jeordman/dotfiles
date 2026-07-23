@@ -108,7 +108,11 @@ TAB3=$(cmux new-surface --workspace "$WS_ID" $NEW_FOCUS_FLAG | grep -oE 'surface
 TAB2=$(cmux new-surface --workspace "$WS_ID" $NEW_FOCUS_FLAG | grep -oE 'surface:[0-9]+')
 
 # Rename tabs
-cmux rename-tab --workspace "$WS_ID" --surface "$TAB1" "claude"
+# NOTE: TAB1 (the claude tab) is intentionally left unnamed. cmux's
+# workspaceAutoNaming (automation.workspaceAutoNaming in cmux.json) auto-titles
+# agent tabs from the conversation at each turn-end, but a manual rename pins the
+# tab and permanently blocks auto-naming. neovim/dev/shell are non-agent tabs, so
+# auto-naming never touches them — keep their labels.
 cmux rename-tab --workspace "$WS_ID" --surface "$TAB2" "neovim"
 if [ -n "$server_command" ]; then
   cmux rename-tab --workspace "$WS_ID" --surface "$TAB3" "dev"

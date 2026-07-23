@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# herdr-agent-picker — fzf popup to jump to any running herdr agent.
+# Bound to `prefix a` in ~/.config/herdr/config.toml (type = "popup").
+#
+# Opens in vim-style NORMAL mode: j/k/g/G navigate, nothing is typed.
+# Press `/` to search (input appears), Esc returns to normal mode,
+# Esc again quits. Enter focuses the selected agent.
+set -euo pipefail
+
+# Popups may launch with a minimal env; make sure the tools are findable.
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
+sel=$(
+  herdr agent list \
+    | jq -r '.result.agents[]
+        | [ (if .focused then "●" else "○" end) + " " + .agent_status,
+            .terminal_title_stripped,
+            .cwd,
+            .pane_id ]
+        | @tsv' \
+    | fzf --delimiter='\t' \
+          --with-nth=1,2,3 \
+          --reverse \
+          --header='NORMAL — j/k move · g/G top/bottom · / search · enter focus · esc quit' \
+          --bind 'start:hide-input+disable-search' \
+          --bind 'j:down,k:up' \
+          --bind 'g:first,G:last' \
+          --bind 'ctrl-d:half-page-down,ctrl-u:half-page-up' \
+          --bind '/:unbind(j,k,g,G,/)+show-input+enable-search' \
+          --bind 'esc:transform:[ "$FZF_INPUT_STATE" = enabled ] && echo "disable-search+hide-input+clear-query+rebind(j,k,g,G,/)" || echo "abort"' \
+          --bind 'enter:accept'
+) || exit 0
+
+[ -n "${sel:-}" ] || exit 0
+printf '%s' "$sel" | cut -f4 | xargs herdr agent focus >/dev/null

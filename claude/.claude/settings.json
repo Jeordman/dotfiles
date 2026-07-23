@@ -1,4 +1,45 @@
 {
+  "agentPushNotifEnabled": true,
+  "effortLevel": "xhigh",
+  "enableAllProjectMcpServers": true,
+  "enabledPlugins": {
+    "playwright@claude-plugins-official": true,
+    "skill-creator@claude-plugins-official": true
+  },
+  "extraKnownMarketplaces": {
+    "anthropic-agent-skills": {
+      "source": {
+        "repo": "anthropics/skills",
+        "source": "github"
+      }
+    }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "bash '/Users/jeordin.callister/.claude/hooks/herdr-agent-state.sh' session",
+            "timeout": 10,
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "[ \"$(cat ~/.config/ntfy/enabled 2>/dev/null)\" = false ] && exit 0; TOPIC=$(cat ~/.config/ntfy/claude-topic 2>/dev/null); [ -n \"$TOPIC\" ] && curl -s -H \"Title: Claude Code\" -H \"Tags: white_check_mark\" -d \"Finished — $(basename \"$PWD\")\" \"https://ntfy.sh/$TOPIC\" >/dev/null 2>&1; true",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      }
+    ]
+  },
+  "model": "opus[1m]",
   "permissions": {
     "allow": [
       "Bash(pwd)",
@@ -84,6 +125,16 @@
       "Edit(//Users/jeordin.callister/Library/Mobile Documents/iCloud~md~obsidian/Documents/jeordin-vault/**)",
       "Edit(//Users/jeordin.callister/Library/Mobile Documents/iCloud~md~obsidian/Documents/unicity-vault/**)"
     ],
+    "ask": [
+      "Bash(env)",
+      "Bash(printenv *)",
+      "Bash(npm install *)",
+      "Bash(wget *)",
+      "Bash(rm *)",
+      "Bash(rm -r *)",
+      "Bash(rm -rf *)"
+    ],
+    "defaultMode": "auto",
     "deny": [
       "Bash(cat *.env*)",
       "Bash(head *.env*)",
@@ -108,56 +159,17 @@
       "Bash(rustc *)",
       "Bash(git commit *)",
       "Bash(git push *)"
-    ],
-    "ask": [
-      "Bash(env)",
-      "Bash(printenv *)",
-      "Bash(npm install *)",
-      "Bash(wget *)",
-      "Bash(rm *)",
-      "Bash(rm -r *)",
-      "Bash(rm -rf *)"
-    ],
-    "defaultMode": "auto"
-  },
-  "model": "opus[1m]",
-  "enableAllProjectMcpServers": true,
-  "hooks": {
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ \"$(cat ~/.config/ntfy/enabled 2>/dev/null)\" = false ] && exit 0; TOPIC=$(cat ~/.config/ntfy/claude-topic 2>/dev/null); [ -n \"$TOPIC\" ] && curl -s -H \"Title: Claude Code\" -H \"Tags: white_check_mark\" -d \"Finished — $(basename \"$PWD\")\" \"https://ntfy.sh/$TOPIC\" >/dev/null 2>&1; true"
-          }
-        ]
-      }
     ]
   },
-  "statusLine": {
-    "type": "command",
-    "command": "bash ~/.claude/statusline-command.sh"
-  },
-  "enabledPlugins": {
-    "skill-creator@claude-plugins-official": true,
-    "playwright@claude-plugins-official": true
-  },
-  "extraKnownMarketplaces": {
-    "anthropic-agent-skills": {
-      "source": {
-        "source": "github",
-        "repo": "anthropics/skills"
-      }
-    }
-  },
-  "effortLevel": "xhigh",
-  "tui": "fullscreen",
-  "skipDangerousModePermissionPrompt": true,
-  "theme": "dark",
   "preferredNotifChannel": "kitty",
   "remoteControlAtStartup": true,
-  "agentPushNotifEnabled": true,
   "skipAutoPermissionPrompt": true,
+  "skipDangerousModePermissionPrompt": true,
+  "statusLine": {
+    "command": "bash ~/.claude/statusline-command.sh",
+    "type": "command"
+  },
+  "theme": "dark",
+  "tui": "fullscreen",
   "voiceEnabled": true
 }
