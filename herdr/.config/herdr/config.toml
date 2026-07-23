@@ -1,0 +1,32 @@
+[theme]
+name = "kanagawa"
+auto_switch = false
+
+[ui]
+show_agent_labels_on_pane_borders = true
+
+agent_panel_sort = "spaces"
+[ui.toast]
+delivery = "terminal"
+
+[keys]
+# tmux muscle-memory (see ~/dotfiles/tmux/.tmux.conf)
+prefix = "ctrl+space"            # tmux: set -g prefix C-Space
+workspace_picker = "prefix+s"    # tmux: bind s choose-tree (workspace ≈ tmux session)
+goto = "prefix+w"                # tmux: bind w choose-tree (navigator: workspaces/tabs/panes)
+focus_agent = "prefix+alt+1..9"  # jump straight to agent N by number
+settings = "prefix+shift+s"      # moved off prefix+s
+reload_config = "prefix+r"       # tmux: bind r source-file
+resize_mode = "prefix+shift+r"   # moved off prefix+r to free it for reload
+split_horizontal = "prefix+quote"    # tmux: bind '"' -> stacked panes
+split_vertical = "prefix+percent"    # tmux: bind % -> side-by-side panes
+# focus_pane_{left,down,up,right} = prefix+h/j/k/l already match tmux defaults
+# new_tab = prefix+c already matches tmux `bind c new-window`
+
+# prefix+a -> fzf popup to pick/jump to any running agent (a UI, not cycling)
+[[keys.command]]
+key = "prefix+a"
+type = "popup"
+command = "/Users/jeordin.callister/dotfiles/bin/bin/herdr-agent-picker"
+width = "70%"
+height = "60%"
