@@ -7,7 +7,7 @@ show_agent_labels_on_pane_borders = true
 
 agent_panel_sort = "spaces"
 [ui.toast]
-delivery = "terminal"
+delivery = "system"
 
 [keys]
 # tmux muscle-memory (see ~/dotfiles/tmux/.tmux.conf)

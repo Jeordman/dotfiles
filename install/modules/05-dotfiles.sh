@@ -45,18 +45,19 @@ backup_if_exists "$HOME/.codex/config.toml"
 backup_if_exists "$HOME/.codex/AGENTS.md"
 backup_if_exists "$HOME/.config/ghostty"
 backup_if_exists "$HOME/.config/btop"
+backup_if_exists "$HOME/.config/herdr/config.toml"
 
 # Stow all configurations
 # Using -R (restow) to handle existing symlinks gracefully
 log_info "Creating symlinks with GNU Stow..."
 
 if [[ "$DRY_RUN" == "true" ]]; then
-    log_info "[DRY RUN] Would run: stow -R -v bin btop claude ghostty git lazygit nvim ntfy tmux yazi zsh"
+    log_info "[DRY RUN] Would run: stow -R -v bin btop claude codex ghostty git herdr lazygit nvim ntfy tmux yazi zsh"
 else
     # Check which directories exist before stowing
     local stow_targets=()
 
-    for dir in bin btop claude codex ghostty git lazygit nvim ntfy tmux yazi zsh; do
+    for dir in bin btop claude codex ghostty git herdr lazygit nvim ntfy tmux yazi zsh; do
         if [ -d "$DOTFILES_DIR/$dir" ]; then
             stow_targets+=("$dir")
         else
