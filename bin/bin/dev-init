@@ -2,21 +2,27 @@
 set -euo pipefail
 
 # dev-init - Initialize a workflow with Claude, Neovim, and dev server
-# Auto-detects tmux vs CMUX and dispatches accordingly.
+# Auto-detects tmux vs CMUX vs herdr and dispatches accordingly.
 # Usage: dev-init [-d DIRECTORY] [-s] [-k] [-t TICKET] [-f]
 #   -d DIRECTORY     Working directory (default: current directory)
 #   -s               Force shell (skip dev server even if package.json exists)
-#   -k               Keep current window (tmux only, ignored in CMUX)
+#   -k               Keep current window (tmux only, ignored in CMUX/herdr)
 #   -t TICKET        Ticket ID to fetch from ClickUp and start Claude in auto-accept mode
-#   -f               Foreground the new CMUX workspace (cmux only; ignored in tmux).
-#                    Default in CMUX is background — build it without stealing focus.
+#   -f               Foreground the new workspace (cmux/herdr only; ignored in tmux).
+#                    Default in CMUX/herdr is background — build it without stealing focus.
 #
 # Session name is automatically derived from the directory name
 
-# Auto-detect: if we're in CMUX (not tmux), delegate to dev-init-cmux
+# Auto-detect the active multiplexer and delegate. Priority: CMUX first, then
+# herdr, else fall through to the tmux path below. The TMUX guard keeps a nested
+# tmux-inside-cmux/herdr session on the tmux path.
 if [ -n "${CMUX_WORKSPACE_ID:-}" ] && [ -z "${TMUX:-}" ]; then
-  # Forward all flags to dev-init-cmux (-d, -s, -t)
+  # Forward all flags to dev-init-cmux (-d, -s, -t, -f)
   exec dev-init-cmux "$@"
+fi
+if [ "${HERDR_ENV:-}" = "1" ] && [ -n "${HERDR_PANE_ID:-}" ] && [ -z "${TMUX:-}" ]; then
+  # Forward all flags to dev-init-herdr (-d, -s, -t, -f)
+  exec dev-init-herdr "$@"
 fi
 
 pkg_manager() {

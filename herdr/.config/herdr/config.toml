@@ -1,3 +1,4 @@
+onboarding = false
 [theme]
 name = "kanagawa"
 auto_switch = false
@@ -5,9 +6,9 @@ auto_switch = false
 [ui]
 show_agent_labels_on_pane_borders = true
 
-agent_panel_sort = "spaces"
+agent_panel_sort = "priority"
 [ui.toast]
-delivery = "system"
+delivery = "herdr"
 
 [keys]
 # tmux muscle-memory (see ~/dotfiles/tmux/.tmux.conf)
@@ -16,12 +17,20 @@ workspace_picker = "prefix+s"    # tmux: bind s choose-tree (workspace ≈ tmux 
 goto = "prefix+w"                # tmux: bind w choose-tree (navigator: workspaces/tabs/panes)
 focus_agent = "prefix+alt+1..9"  # jump straight to agent N by number
 settings = "prefix+shift+s"      # moved off prefix+s
-reload_config = "prefix+r"       # tmux: bind r source-file
-resize_mode = "prefix+shift+r"   # moved off prefix+r to free it for reload
+rename_tab = "prefix+r"          # tmux: bind , rename-window (reload via CLI: herdr server reload-config)
+resize_mode = "prefix+shift+r"   # moved off prefix+r
 split_horizontal = "prefix+quote"    # tmux: bind '"' -> stacked panes
 split_vertical = "prefix+percent"    # tmux: bind % -> side-by-side panes
 # focus_pane_{left,down,up,right} = prefix+h/j/k/l already match tmux defaults
 # new_tab = prefix+c already matches tmux `bind c new-window`
+
+# Navigate-mode (goto, prefix+w): vim j/k walk the spaces list instead of arrows.
+# This takes j/k off pane up/down, so arrows drive pane vertical (arrows already
+# do pane left/right). Net: j/k = spaces, arrows = panes.
+navigate_workspace_up = "k"
+navigate_workspace_down = "j"
+navigate_pane_up = "up"
+navigate_pane_down = "down"
 
 # prefix+a -> fzf popup to pick/jump to any running agent (a UI, not cycling)
 [[keys.command]]

@@ -1,0 +1,11 @@
+theme = "aurora-x"
+mode = "auto"                        # split on wide panes, stack on narrow
+vcs = "git"
+watch = false
+exclude_untracked = false
+line_numbers = true                  # you run line-numbers.nvim
+wrap_lines = false                   # nvim: vim.opt.wrap = false
+menu_bar = true
+agent_notes = true                   # inline notes on agent-authored changes
+prompt_save_view_preferences = false # dotfiles config is the source of truth
+transparent_background = true        # inherit terminal bg, like nvim catppuccin

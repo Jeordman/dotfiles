@@ -14,7 +14,11 @@ pkg_manager() {
 }
 
 WORK_DIR="$(pwd)"
-SESSION_NAME="$(basename "$WORK_DIR" | sed 's/^new-shop-//')"
+# Label = the branch's descriptive slug. Drop the "new-shop-" worktree prefix and
+# any leading "<type>-<TICKET>-" (e.g. feat-ECOM-6482-) so the workspace reads
+# "buy-now-..." instead of "feat-ECOM-6482-buy-now-...". This is purely cosmetic:
+# `git gtr rm` cleanup (gtr-preremove) matches workspaces by pane cwd, not by label.
+SESSION_NAME="$(basename "$WORK_DIR" | sed -E 's/^new-shop-//; s/^([a-z]+-)?[A-Z]+-[0-9]+-//')"
 
 if ! command -v cmux &>/dev/null; then
   echo "Error: cmux not found. Install from https://www.cmux.dev"
@@ -44,7 +48,10 @@ TAB1=$(cmux list-pane-surfaces --workspace "$WS_ID" | grep -oE 'surface:[0-9]+' 
 TAB3=$(cmux new-surface --workspace "$WS_ID" | grep -oE 'surface:[0-9]+')
 TAB2=$(cmux new-surface --workspace "$WS_ID" | grep -oE 'surface:[0-9]+')
 
-cmux rename-tab --workspace "$WS_ID" --surface "$TAB1" "claude"
+# NOTE: TAB1 (the claude tab) is intentionally left unnamed. cmux's
+# workspaceAutoNaming auto-titles agent tabs from the conversation at each
+# turn-end, but a manual rename pins the tab and permanently blocks auto-naming.
+# neovim/dev/shell are non-agent tabs, so auto-naming never touches them.
 cmux rename-tab --workspace "$WS_ID" --surface "$TAB2" "neovim"
 if [ -n "$server_command" ]; then
   cmux rename-tab --workspace "$WS_ID" --surface "$TAB3" "dev"

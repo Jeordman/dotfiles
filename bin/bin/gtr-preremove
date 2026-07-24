@@ -1,41 +1,80 @@
 #!/usr/bin/env bash
-# gtr.hook.preRemove — close any cmux workspaces rooted in the worktree
+# gtr.hook.preRemove — close any cmux/herdr workspaces rooted in the worktree
 # being removed, so dev servers / claude / nvim die cleanly before files
 # vanish under them.
 #
-# Always exits 0 — never block `git gtr rm` if cmux is down or jq missing.
+# Handles whichever multiplexer(s) are installed — each cleanup is guarded and
+# best-effort. Always exits 0; never blocks `git gtr rm`.
 # Portable to bash 3.2 (default macOS /bin/bash).
 
 [ -n "$WORKTREE_PATH" ] || exit 0
-command -v cmux >/dev/null 2>&1 || exit 0
-command -v jq   >/dev/null 2>&1 || exit 0
+command -v jq >/dev/null 2>&1 || exit 0
 
-ws_list=$(cmux rpc workspace.list 2>/dev/null) || exit 0
-[ -n "$ws_list" ] || exit 0
+# --- cmux: match workspaces whose current_directory is at/under WORKTREE_PATH ---
+cmux_cleanup() {
+  command -v cmux >/dev/null 2>&1 || return 0
 
-current_id=$(cmux rpc workspace.current 2>/dev/null \
-  | jq -r '.workspace.id // empty' 2>/dev/null)
+  ws_list=$(cmux rpc workspace.list 2>/dev/null) || return 0
+  [ -n "$ws_list" ] || return 0
 
-# Match workspaces whose cwd equals WORKTREE_PATH or sits under it.
-# Skip the workspace running this hook to avoid self-kill.
-hits=$(printf '%s\n' "$ws_list" | jq -r \
-  --arg path "$WORKTREE_PATH" \
-  --arg cur "$current_id" '
-    .workspaces[]
-    | select(.current_directory != null)
-    | select(.current_directory == $path
-             or (.current_directory | startswith($path + "/")))
-    | select(.id != $cur)
-    | "\(.id)\t\(.title)"
-  ' 2>/dev/null)
+  current_id=$(cmux rpc workspace.current 2>/dev/null \
+    | jq -r '.workspace.id // empty' 2>/dev/null)
 
-[ -n "$hits" ] || exit 0
+  # Skip the workspace running this hook to avoid self-kill.
+  hits=$(printf '%s\n' "$ws_list" | jq -r \
+    --arg path "$WORKTREE_PATH" \
+    --arg cur "$current_id" '
+      .workspaces[]
+      | select(.current_directory != null)
+      | select(.current_directory == $path
+               or (.current_directory | startswith($path + "/")))
+      | select(.id != $cur)
+      | "\(.id)\t\(.title)"
+    ' 2>/dev/null)
 
-while IFS=$'\t' read -r id title; do
-  [ -n "$id" ] || continue
-  printf '  → closing cmux workspace "%s"\n' "$title"
-  cmux rpc workspace.close "{\"workspace_id\":\"$id\"}" >/dev/null 2>&1 \
-    || printf '    warn: failed to close %s\n' "$title"
-done <<< "$hits"
+  [ -n "$hits" ] || return 0
+
+  while IFS=$'\t' read -r id title; do
+    [ -n "$id" ] || continue
+    printf '  → closing cmux workspace "%s"\n' "$title"
+    cmux rpc workspace.close "{\"workspace_id\":\"$id\"}" >/dev/null 2>&1 \
+      || printf '    warn: failed to close %s\n' "$title"
+  done <<< "$hits"
+}
+
+# --- herdr: match workspaces that own a pane whose cwd is at/under WORKTREE_PATH ---
+# herdr's `workspace list` has no directory field, so we key off pane cwd instead.
+# Pane ids look like "wA:p1"; the workspace id is the part before the colon, which
+# is also how we identify the current workspace to skip (from $HERDR_PANE_ID).
+herdr_cleanup() {
+  command -v herdr >/dev/null 2>&1 || return 0
+
+  pane_list=$(herdr pane list 2>/dev/null) || return 0
+  [ -n "$pane_list" ] || return 0
+
+  current_ws="${HERDR_PANE_ID%%:*}"
+
+  ws_ids=$(printf '%s' "$pane_list" | jq -r \
+    --arg path "$WORKTREE_PATH" \
+    --arg cur "$current_ws" '
+      .result.panes[]?
+      | select(.cwd != null)
+      | select(.cwd == $path or (.cwd | startswith($path + "/")))
+      | .workspace_id
+      | select(. != $cur)
+    ' 2>/dev/null | sort -u)
+
+  [ -n "$ws_ids" ] || return 0
+
+  while read -r id; do
+    [ -n "$id" ] || continue
+    printf '  → closing herdr workspace %s\n' "$id"
+    herdr workspace close "$id" >/dev/null 2>&1 \
+      || printf '    warn: failed to close %s\n' "$id"
+  done <<< "$ws_ids"
+}
+
+cmux_cleanup
+herdr_cleanup
 
 exit 0

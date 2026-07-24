@@ -1,5 +1,13 @@
+# Match cmux's palette exactly (fixes muted lazygit/TUI colors).
+# cmux uses libghostty + this bundled theme; its bg is already #1e1e1e.
+theme = "Apple System Colors"
+
+# Redundant with the theme's bg (#1e1e1e) but kept to document intent:
+# The Spire terminal background (sampled: rgb 30,30,30)
+background = 1e1e1e
+
 # Set background transparency (0.0 = fully transparent, 1.0 = opaque)
-background-opacity = 0.70
+background-opacity = 1
 
 # Enable blur behind the terminal
 background-blur = true

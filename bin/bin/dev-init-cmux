@@ -56,7 +56,11 @@ fi
 
 # Convert to absolute path
 WORK_DIR="$(cd "$WORK_DIR" && pwd)"
-SESSION_NAME="$(basename "$WORK_DIR" | sed 's/^new-shop-//')"
+# Label = the branch's descriptive slug. Drop the "new-shop-" worktree prefix and
+# any leading "<type>-<TICKET>-" (e.g. feat-ECOM-6482-) so the workspace reads
+# "buy-now-..." instead of "feat-ECOM-6482-buy-now-...". This is purely cosmetic:
+# `git gtr rm` cleanup (gtr-preremove) matches workspaces by pane cwd, not by label.
+SESSION_NAME="$(basename "$WORK_DIR" | sed -E 's/^new-shop-//; s/^([a-z]+-)?[A-Z]+-[0-9]+-//')"
 
 # Check cmux is available
 if ! command -v cmux &>/dev/null; then
