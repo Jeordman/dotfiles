@@ -1,0 +1,172 @@
+{
+  "$comment": "Policy for unattended runs ONLY. Launch with: claude --setting-sources local --settings ~/dotfiles/claude/.claude/settings.unattended.json  (VERIFIED 2026-07-25). Why 'local' and not 'user' or 'managed': --setting-sources accepts only user|project|local. 'project' pulls the repo's 45 denies and its git/MCP deny hooks; 'user' pulls the global deny on git commit/push, and a deny always beats a higher-precedence allow — both were tested and both refuse the loop. The repo's .claude/settings.local.json has an empty deny array and defines no hooks, so it is the only near-empty base available. There is no `ask` array by design: in an unattended run an ask is a hang, so every rule is allow or deny.",
+
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "ask": [],
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Edit",
+      "Write",
+      "NotebookEdit",
+      "Bash(pnpm:*)",
+      "Bash(node:*)",
+      "Bash(npx:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git fetch:*)",
+      "Bash(git ls-remote:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(curl:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(rg:*)",
+      "Bash(fd:*)",
+      "Bash(find:*)",
+      "Bash(jq:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)",
+      "Bash(echo:*)",
+      "Bash(printf:*)",
+      "Bash(gh pr:*)",
+      "Bash(gh run:*)",
+      "Bash(deploy-watch:*)",
+      "Bash(wait-for-push:*)",
+      "Bash(cloud-fix-dispatch:*)",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "mcp__plugin_playwright_playwright__browser_snapshot",
+      "mcp__plugin_playwright_playwright__browser_click",
+      "mcp__plugin_playwright_playwright__browser_type",
+      "mcp__plugin_playwright_playwright__browser_fill_form",
+      "mcp__plugin_playwright_playwright__browser_select_option",
+      "mcp__plugin_playwright_playwright__browser_press_key",
+      "mcp__plugin_playwright_playwright__browser_hover",
+      "mcp__plugin_playwright_playwright__browser_wait_for",
+      "mcp__plugin_playwright_playwright__browser_take_screenshot",
+      "mcp__plugin_playwright_playwright__browser_console_messages",
+      "mcp__plugin_playwright_playwright__browser_network_requests",
+      "mcp__plugin_playwright_playwright__browser_evaluate",
+      "mcp__plugin_playwright_playwright__browser_find",
+      "mcp__plugin_playwright_playwright__browser_navigate_back",
+      "mcp__plugin_playwright_playwright__browser_handle_dialog",
+      "mcp__plugin_playwright_playwright__browser_resize",
+      "mcp__plugin_playwright_playwright__browser_tabs",
+      "mcp__plugin_playwright_playwright__browser_close",
+      "mcp__plugin_playwright_playwright__browser_install",
+      "mcp__claude_ai_Vercel__list_deployments",
+      "mcp__claude_ai_Vercel__get_deployment",
+      "mcp__claude_ai_Vercel__get_deployment_build_logs",
+      "mcp__claude_ai_Vercel__get_runtime_logs",
+      "mcp__claude_ai_Vercel__get_runtime_errors",
+      "mcp__claude_ai_Vercel__list_projects",
+      "mcp__claude_ai_Vercel__list_teams",
+      "mcp__clickup__clickup_get_task",
+      "mcp__clickup__clickup_search",
+      "mcp__clickup__clickup_create_comment"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push origin master:*)",
+      "Bash(git push origin staging:*)",
+      "Bash(git push origin main:*)",
+      "Bash(git reset:*)",
+      "Bash(git rebase:*)",
+      "Bash(git checkout:*)",
+      "Bash(git switch:*)",
+      "Bash(git clean:*)",
+      "Bash(git filter-branch:*)",
+      "Bash(git remote:*)",
+      "Bash(env)",
+      "Bash(printenv:*)",
+      "Bash(sudo:*)",
+      "Bash(ssh:*)",
+      "Bash(scp:*)",
+      "Bash(rsync:*)",
+      "Bash(chmod:*)",
+      "Bash(chown:*)",
+      "Bash(brew:*)",
+      "Bash(rm -rf /:*)",
+      "Bash(rm -rf ~:*)",
+      "Read(//Users/jeordin.callister/.ssh/**)",
+      "Read(//Users/jeordin.callister/.aws/**)",
+      "Bash(cat *.env*)",
+      "Bash(head *.env*)",
+      "Bash(tail *.env*)"
+    ]
+  },
+
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,
+    "$excludedComment": "git is excluded because the sandbox proxy allowlists by hostname over HTTP(S) and cannot carry SSH: a sandboxed push to git@github.com fails with 'nc: authentication method negotiation failed' (verified 2026-07-25). gh is excluded because Go-based CLIs fail TLS verification under Seatbelt. The three workflow wrappers are excluded because Seatbelt applies to the whole process tree: deploy-watch spawns gh, wait-for-push spawns git ls-remote, and cloud-fix-dispatch spawns both plus `claude --cloud` (which needs claude.ai, deliberately NOT added to allowedDomains — excluding the one wrapper is narrower than opening a domain to every command). Bare and starred forms are both listed because these take no-argument invocations. Nothing loses protection: git is governed semantically by unattended-git-guard.sh plus the deny patterns above, which is stronger than the sandbox for this purpose.",
+    "excludedCommands": [
+      "gh *", "git *",
+      "deploy-watch", "deploy-watch *",
+      "wait-for-push", "wait-for-push *",
+      "cloud-fix-dispatch", "cloud-fix-dispatch *"
+    ],
+    "network": {
+      "allowedDomains": [
+        "*.vercel.app",
+        "github.com",
+        "*.github.com",
+        "registry.npmjs.org",
+        "*.npmjs.org"
+      ]
+    },
+    "credentials": {
+      "files": [
+        { "path": "~/.ssh", "mode": "deny" },
+        { "path": "~/.aws/credentials", "mode": "deny" }
+      ]
+    }
+  },
+
+  "$hooksComment": "Both entries invoke via `bash '<path>'` rather than executing the file directly, so they do not depend on an exec bit that the editing tool cannot set. The Stop entry was MISSING until 2026-07-26 — the gate script existed, was tested 11/11, and was documented as 'wired from settings.unattended.json', but nothing registered it, so it never ran. Do not remove it; without it the loop can end on a false pass.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash '/Users/jeordin.callister/.claude/hooks/unattended-git-guard.sh'",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash '/Users/jeordin.callister/.claude/hooks/unattended-stop-gate.sh'",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  },
+
+  "$pluginComment": "REQUIRED, not optional. Playwright is a plugin enabled via enabledPlugins in user-scope settings, and this profile deliberately omits the user scope — so without re-declaring it here the browser tools vanish and the entire local verification phase has nothing to drive. Verified missing before this was added (2026-07-25).",
+  "enabledPlugins": {
+    "playwright@claude-plugins-official": true
+  },
+
+  "includeCoAuthoredBy": false,
+  "effortLevel": "xhigh",
+  "model": "opus[1m]"
+}

@@ -51,13 +51,24 @@ backup_if_exists "$HOME/.config/herdr/config.toml"
 # Using -R (restow) to handle existing symlinks gracefully
 log_info "Creating symlinks with GNU Stow..."
 
+# ghostty is a GUI terminal emulator and herdr is a macOS-only binary whose config
+# hardcodes /Users paths — both are client-side tools. On a headless Linux box
+# (e.g. the home server) their configs are dead weight at best and quietly
+# misleading at worst, so they're excluded there.
+STOW_PACKAGES=(bin btop claude codex git hunk lazygit nvim tmux yazi zsh)
+if [[ "$OS_TYPE" == "macos" ]]; then
+    STOW_PACKAGES+=(ghostty herdr)
+fi
+
 if [[ "$DRY_RUN" == "true" ]]; then
-    log_info "[DRY RUN] Would run: stow -R -v bin btop claude codex ghostty git herdr hunk lazygit nvim tmux yazi zsh"
+    log_info "[DRY RUN] Would run: stow -R -v ${STOW_PACKAGES[*]}"
 else
     # Check which directories exist before stowing
-    local stow_targets=()
+    # Not `local` — this block runs at top level when the module is executed
+    # standalone (see the source guard at the top of the file).
+    stow_targets=()
 
-    for dir in bin btop claude codex ghostty git herdr hunk lazygit nvim tmux yazi zsh; do
+    for dir in "${STOW_PACKAGES[@]}"; do
         if [ -d "$DOTFILES_DIR/$dir" ]; then
             stow_targets+=("$dir")
         else

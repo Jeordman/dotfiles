@@ -69,9 +69,15 @@ fi
 WORK_DIR="$(cd "$WORK_DIR" && pwd)"
 # Label = the branch's descriptive slug. Drop the "new-shop-" worktree prefix and
 # any leading "<type>-<TICKET>-" (e.g. feat-ECOM-6482-) so the workspace reads
-# "buy-now-..." instead of "feat-ECOM-6482-buy-now-...". This is purely cosmetic:
-# `git gtr rm` cleanup (gtr-preremove) matches workspaces by pane cwd, not by label.
+# "buy-now-..." instead of "feat-ECOM-6482-buy-now-...". Purely cosmetic:
+# `git gtr rm` cleanup (gtr-preremove) never matches on the label — it uses the
+# workspace id recorded below, falling back to pane cwd.
 SESSION_NAME="$(basename "$WORK_DIR" | sed -E 's/^new-shop-//; s/^([a-z]+-)?[A-Z]+-[0-9]+-//')"
+
+# Where we record "this worktree -> this workspace id" for gtr-preremove.
+# Keep this path + filename encoding in sync with gtr-preremove.
+WS_MAP_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dev-init/herdr-workspaces"
+WS_MAP_FILE="$WS_MAP_DIR/$(printf '%s' "$WORK_DIR" | tr '/' '%')"
 
 # Check herdr is available
 if ! command -v herdr &>/dev/null; then
@@ -111,6 +117,11 @@ if [ -z "$WS_ID" ] || [ "$WS_ID" = "null" ]; then
   printf '%s\n' "$ws_json"
   exit 1
 fi
+
+# Record the mapping so `git gtr rm <branch>` can close this workspace even after
+# every pane has cd'd out of the worktree (e.g. into the main repo to fix a
+# conflict) — pane-cwd matching alone misses that case. Best-effort.
+mkdir -p "$WS_MAP_DIR" 2>/dev/null && printf '%s\n' "$WS_ID" > "$WS_MAP_FILE" 2>/dev/null || true
 
 # Create the neovim + dev/shell tabs (in order — herdr appends, so this gives
 # claude | neovim | dev). Always --no-focus so building tabs doesn't yank focus.

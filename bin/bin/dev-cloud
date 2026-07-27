@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# dev-cloud — workspace for a ticket whose implementation runs in the cloud.
+#
+# Usage: dev-cloud [-d DIRECTORY] [-t TICKET]
+#
+# Differs from dev-init in exactly two ways, and delegates everything else to it
+# so there is one implementation of the herdr/cmux/tmux layout rather than two:
+#
+#   1. No dev server. You are not editing here while the cloud session works,
+#      and the feature gets verified against the deployed preview URL rather than
+#      localhost — so a local server would burn a port and CPU for nothing.
+#      (`dev-init -s` gives claude | nvim | shell; the shell pane is where the
+#      branch watcher goes once there is a SHA to watch.)
+#
+#   2. Dependencies pre-warm in the background. The local fix phase needs tsc,
+#      lint and Playwright ready, and the cloud session is going to take minutes
+#      anyway — so idle time is free. By the time work comes back, node_modules
+#      is there.
+#
+# Why not a full herdr sibling of dev-init-herdr: that file already handles
+# workspace creation, tab ordering, the gtr-preremove workspace mapping and the
+# cmux/tmux/herdr dispatch. Reimplementing it here would duplicate ~200 lines
+# and drift.
+
+set -uo pipefail
+
+WORK_DIR="$(pwd)"
+TICKET=""
+
+while getopts "d:t:h" opt; do
+  case $opt in
+    d) WORK_DIR="$OPTARG" ;;
+    t) TICKET="$OPTARG" ;;
+    h) echo "dev-cloud [-d DIRECTORY] [-t TICKET]"; exit 0 ;;
+    *) echo "dev-cloud [-d DIRECTORY] [-t TICKET]"; exit 2 ;;
+  esac
+done
+
+[ -d "$WORK_DIR" ] || { echo "dev-cloud: no such directory: $WORK_DIR" >&2; exit 2; }
+WORK_DIR="$(cd "$WORK_DIR" && pwd)"
+
+pkg_manager() { command -v pnpm >/dev/null 2>&1 && echo pnpm || echo npm; }
+
+# Pre-warm dependencies detached, so workspace creation is not blocked by it.
+if [ -f "$WORK_DIR/package.json" ]; then
+  LOG="${TMPDIR:-/tmp}/dev-cloud-install-$(basename "$WORK_DIR").log"
+  echo "dev-cloud: pre-warming dependencies in the background ($LOG)"
+  ( cd "$WORK_DIR" && "$(pkg_manager)" install >"$LOG" 2>&1 ) &
+fi
+
+cat <<EOF
+dev-cloud: cloud-mode workspace for $(basename "$WORK_DIR")
+  no dev server — the feature is verified against the deployed preview URL
+
+  next:  cloud-ticket-dispatch ${TICKET:-<TICKET>}
+         → pushes the branch, hands the ticket to a cloud session
+         (or /cloud-ticket ${TICKET:-<TICKET>} from the claude pane)
+
+  then:  manage the run in the Claude UI — cloud sessions are not visible
+         from the terminal. A native notification arrives when it finishes.
+
+  verify locally once it has pushed and deployed:
+
+           git fetch
+           deploy-watch -s \$(git rev-parse origin/\$(git branch --show-current))
+           claude-unattended
+
+EOF
+
+# -s forces the shell pane instead of a dev server; everything else is dev-init's.
+if [ -n "$TICKET" ]; then
+  exec dev-init -d "$WORK_DIR" -s -t "$TICKET"
+else
+  exec dev-init -d "$WORK_DIR" -s
+fi

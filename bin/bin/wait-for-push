@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# wait-for-push — block until a branch's remote tip MOVES, then print the new SHA.
+#
+# Usage: wait-for-push [-b branch] [-s baseline-sha] [-i interval] [-t timeout]
+#
+# The missing link in the cloud-always loop. Everything else was already
+# composable — `cloud-fix-dispatch` sends work out, `deploy-watch` gates on a
+# build — but nothing waited for the cloud session to actually push, so there
+# was no SHA to hand to deploy-watch.
+#
+# Deliberately compares against a BASELINE rather than "is there a commit":
+# the branch already has commits when a fix is dispatched, so the only useful
+# signal is that the tip changed. Passing the pre-dispatch SHA makes the wait
+# exact and immune to a stale fetch.
+#
+# Uses `git ls-remote` rather than `git fetch` + rev-parse on purpose: it asks
+# the remote directly, touches no local refs, and cannot be fooled by a fetch
+# that already ran. Nothing in the working tree is modified.
+#
+# STDOUT is ONLY the new SHA, so `NEW=$(wait-for-push ...)` works. All progress
+# goes to stderr.
+#
+# Exit codes are the contract with the caller:
+#   0  the tip moved; the new SHA is on stdout
+#   3  timed out with the tip unchanged
+#   4  usage or environment problem
+#
+# A timeout is reported, never swallowed: in an unattended run "still waiting"
+# and "the cloud session never ran" look identical, and the second is the
+# common case (see D1 in the plan).
+
+set -uo pipefail
+
+BRANCH=""
+BASELINE=""
+INTERVAL=20
+TIMEOUT=1800
+QUIET=false
+
+usage() {
+  cat <<'USAGE'
+wait-for-push [options]
+  -b <branch>   branch to watch        (default: current branch)
+  -s <sha>      baseline to compare to (default: current origin/<branch> tip)
+  -i <seconds>  poll interval          (default 20)
+  -t <seconds>  timeout                (default 1800)
+  -q            suppress progress
+Prints the new SHA on stdout.
+Exit: 0 moved · 3 timeout · 4 usage/env
+USAGE
+}
+
+while getopts "b:s:i:t:qh" opt; do
+  case $opt in
+    b) BRANCH="$OPTARG" ;;
+    s) BASELINE="$OPTARG" ;;
+    i) INTERVAL="$OPTARG" ;;
+    t) TIMEOUT="$OPTARG" ;;
+    q) QUIET=true ;;
+    h) usage; exit 0 ;;
+    *) usage; exit 4 ;;
+  esac
+done
+
+note() { [ "$QUIET" = true ] || echo "wait-for-push: $*" >&2; }
+die()  { echo "wait-for-push: $1" >&2; exit 4; }
+
+command -v git >/dev/null || die "git not found"
+git rev-parse --show-toplevel >/dev/null 2>&1 || die "not inside a git repository"
+
+[ -n "$BRANCH" ] || BRANCH=$(git branch --show-current 2>/dev/null)
+[ -n "$BRANCH" ] || die "detached HEAD and no -b given"
+
+remote_tip() { git ls-remote origin "refs/heads/$BRANCH" 2>/dev/null | awk 'NR==1{print $1}'; }
+
+# `git ls-remote` always returns a full 40-char SHA, but a human (or a copied log
+# line) will hand over an abbreviated one. A plain string `!=` then compares
+# "5837931" against "5837931151dd…" and reports MOVED instantly — returning the
+# pre-fix SHA, so deploy-watch gates on the already-built deployment and the
+# re-verification tests stale code. Compare by prefix in both directions.
+# Verified as a live failure 2026-07-26 before this existed.
+same_commit() {
+  [ -n "$1" ] && [ -n "$2" ] || return 1
+  case "$1" in "$2"*) return 0 ;; esac
+  case "$2" in "$1"*) return 0 ;; esac
+  return 1
+}
+
+if [ -z "$BASELINE" ]; then
+  BASELINE=$(remote_tip)
+  [ -n "$BASELINE" ] || die "branch '$BRANCH' is not on origin — nothing to wait for"
+  note "no baseline given; using current tip $(printf '%s' "$BASELINE" | cut -c1-9)"
+fi
+
+# Guard the prefix comparison: a 1-2 char baseline would match almost any tip and
+# make the wait return immediately, which is the failure mode this whole script
+# exists to prevent.
+printf '%s' "$BASELINE" | grep -qE '^[0-9a-fA-F]{7,40}$' \
+  || die "baseline '$BASELINE' is not a SHA of at least 7 hex chars"
+
+note "watching origin/$BRANCH for a new commit (baseline $(printf '%s' "$BASELINE" | cut -c1-9), timeout ${TIMEOUT}s)"
+
+ELAPSED=0
+while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
+  TIP=$(remote_tip)
+  if [ -n "$TIP" ] && ! same_commit "$TIP" "$BASELINE"; then
+    note "moved -> $(printf '%s' "$TIP" | cut -c1-9)"
+    printf '%s\n' "$TIP"
+    exit 0
+  fi
+  sleep "$INTERVAL"
+  ELAPSED=$((ELAPSED + INTERVAL))
+  note "still unchanged (${ELAPSED}s elapsed)"
+done
+
+note "TIMEOUT after ${TIMEOUT}s — origin/$BRANCH never moved. The cloud session may not have run at all; check the session URL in the Claude UI."
+exit 3

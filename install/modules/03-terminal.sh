@@ -47,7 +47,10 @@ fi
 log_info "Installing modern CLI tools..."
 
 # bat (better cat)
+# Debian/Ubuntu ship the binary as `batcat` (clash with an older package), so
+# without the alias below `bat` simply isn't on PATH after a successful install.
 ensure_package "bat" "bat" "bat"
+link_debian_binary_alias "bat" "batcat"
 
 # btop (system monitor)
 ensure_package "btop" "btop" "btop"
@@ -56,18 +59,21 @@ ensure_package "btop" "btop" "btop"
 if [[ "$OS_TYPE" == "macos" ]]; then
     ensure_package "eza" "eza" "eza"
 else
-    # eza may need to be installed from cargo on some Linux distros
     if ! command -v eza &> /dev/null; then
         case "$PACKAGE_MANAGER" in
             apt)
-                # Check if cargo is available, otherwise install from package if available
-                if command -v cargo &> /dev/null; then
-                    log_info "Installing eza via cargo..."
+                # eza reached the Debian/Ubuntu repos (Ubuntu 24.04+), so try apt
+                # before pulling in a whole Rust toolchain for a directory lister.
+                if apt-cache show eza &> /dev/null; then
+                    ensure_package "eza" "eza" "eza"
+                elif command -v cargo &> /dev/null; then
+                    log_info "eza not packaged on this release; installing via cargo..."
                     cargo install eza
                 else
-                    log_warning "SKIPPED: eza requires Rust/Cargo which is not installed"
+                    log_warning "SKIPPED: eza isn't in apt on this release and Rust/Cargo is not installed"
                     log_info "To install Rust: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
                     log_info "Then re-run this installer to get eza"
+                    record_failed_package "eza"
                 fi
                 ;;
             dnf|pacman)
@@ -75,6 +81,7 @@ else
                 ;;
             *)
                 log_warning "eza installation not automated for this package manager"
+                record_failed_package "eza"
                 ;;
         esac
     else
@@ -101,8 +108,22 @@ ensure_package "thefuck" "thefuck" "thefuck"
 # File manager and media tools
 log_info "Installing file manager tools..."
 
-# Yazi file manager
-ensure_package "yazi" "yazi" "yazi"
+# Yazi file manager — no apt package exists on any current Debian/Ubuntu
+if [[ "$PACKAGE_MANAGER" == "apt" ]]; then
+    if command -v yazi &> /dev/null; then
+        log_success "yazi already installed"
+    elif command -v cargo &> /dev/null; then
+        log_info "Installing yazi via cargo..."
+        cargo install --locked yazi-fm yazi-cli
+        log_success "yazi installed"
+    else
+        log_warning "SKIPPED: yazi has no apt package; needs Rust/Cargo or a release binary"
+        log_info "See https://github.com/sxyazi/yazi/releases"
+        record_failed_package "yazi"
+    fi
+else
+    ensure_package "yazi" "yazi" "yazi"
+fi
 
 # Yazi dependencies for media preview support
 ensure_package "ffmpeg" "ffmpeg" "FFmpeg"
@@ -130,6 +151,7 @@ else
             log_warning "SKIPPED: resvg requires Rust/Cargo which is not installed"
             log_info "To install Rust: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
             log_info "Then re-run this installer to get resvg"
+            record_failed_package "resvg"
         fi
     else
         log_success "resvg already installed"
@@ -151,7 +173,9 @@ fi
 log_info "Setting up NVM (Node Version Manager)..."
 if [ ! -d "$HOME/.nvm" ]; then
     log_info "Installing NVM..."
-    local nvm_version="v0.40.0"
+    # Not `local` — this module runs at top level when executed standalone
+    # (see the source guard at the top of the file), where `local` is a syntax error.
+    nvm_version="v0.40.0"
     safe_curl_install "https://raw.githubusercontent.com/nvm-sh/nvm/$nvm_version/install.sh" "NVM"
 
     # Load NVM for current session

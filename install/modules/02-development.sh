@@ -16,11 +16,19 @@ log_step "Installing Development Tools"
 ensure_package "nvim" "neovim" "Neovim"
 
 # tree-sitter CLI (required by nvim-treesitter main branch to compile parsers)
-# Note: brew 'tree-sitter' is the C library only; the CLI comes from npm
+# Note: brew 'tree-sitter' is the C library only; the CLI comes from npm.
+# On a fresh box npm doesn't exist yet — nvm is installed in 03-terminal.sh,
+# which runs after this module.
 if ! command -v tree-sitter &> /dev/null; then
-    log_info "Installing tree-sitter CLI..."
-    npm install -g tree-sitter-cli
-    log_success "tree-sitter CLI installed"
+    if command -v npm &> /dev/null; then
+        log_info "Installing tree-sitter CLI..."
+        npm install -g tree-sitter-cli
+        log_success "tree-sitter CLI installed"
+    else
+        log_warning "SKIPPED: tree-sitter CLI needs npm, which isn't installed yet"
+        log_info "Re-run this script after nvm, or: npm install -g tree-sitter-cli"
+        record_failed_package "tree-sitter CLI (needs npm)"
+    fi
 else
     log_success "tree-sitter CLI already installed"
 fi
@@ -32,14 +40,21 @@ ensure_package "rg" "ripgrep" "ripgrep"
 ensure_package "fzf" "fzf" "fzf"
 
 # fd (fast find alternative, used by Telescope)
+# Debian/Ubuntu ship the binary as `fdfind` to avoid a clash with an older
+# package, so the alias below is what actually puts `fd` on PATH.
 if [[ "$PACKAGE_MANAGER" == "apt" ]]; then
     ensure_package "fd" "fd-find" "fd"
+    link_debian_binary_alias "fd" "fdfind"
 else
     ensure_package "fd" "fd" "fd"
 fi
 
-# lazygit (git UI in neovim)
-ensure_package "lazygit" "lazygit" "lazygit"
+# lazygit (git UI in neovim) — not packaged for apt at all
+if [[ "$PACKAGE_MANAGER" == "apt" ]]; then
+    install_from_github_release "jesseduffield/lazygit" "lazygit" "Linux_x86_64.tar.gz" "lazygit"
+else
+    ensure_package "lazygit" "lazygit" "lazygit"
+fi
 
 # jq (JSON processor)
 ensure_package "jq" "jq" "jq"
@@ -58,19 +73,26 @@ else
 fi
 
 # Maestro (mobile UI testing — used by the sim-loop skill for iOS work, e.g. topout app)
-# Requires Temurin JDK (Maestro runs on the JVM)
-if ! brew list --cask temurin &> /dev/null; then
-    log_info "Installing Temurin JDK (required by Maestro)..."
-    brew install --cask temurin && log_success "Temurin installed"
+# macOS only: it drives iOS simulators, which don't exist elsewhere. This also has
+# to be guarded because `brew` isn't present on a stock Linux box, and the bare
+# `brew install ... && log_success` below would abort the whole run under `set -e`.
+if [[ "$OS_TYPE" == "macos" ]]; then
+    # Requires Temurin JDK (Maestro runs on the JVM)
+    if ! brew list --cask temurin &> /dev/null; then
+        log_info "Installing Temurin JDK (required by Maestro)..."
+        brew install --cask temurin && log_success "Temurin installed"
+    else
+        log_success "Temurin already installed"
+    fi
+    # NOTE: do NOT use `brew install maestro` — that installs a music app, not the testing tool
+    if ! command -v maestro &> /dev/null; then
+        log_info "Installing Maestro..."
+        curl -Ls "https://get.maestro.mobile.dev" | bash && log_success "Maestro installed"
+    else
+        log_success "Maestro already installed"
+    fi
 else
-    log_success "Temurin already installed"
-fi
-# NOTE: do NOT use `brew install maestro` — that installs a music app, not the testing tool
-if ! command -v maestro &> /dev/null; then
-    log_info "Installing Maestro..."
-    curl -Ls "https://get.maestro.mobile.dev" | bash && log_success "Maestro installed"
-else
-    log_success "Maestro already installed"
+    log_info "Skipping Temurin + Maestro (iOS simulator tooling, macOS only)"
 fi
 
 # GitHub CLI
@@ -111,11 +133,17 @@ else
     log_success "Claude Code already installed"
 fi
 
-# Codex CLI (OpenAI)
+# Codex CLI (OpenAI) — npm-only, and npm may not exist yet (see tree-sitter above)
 if ! command -v codex &> /dev/null; then
-    log_info "Installing Codex CLI..."
-    npm install -g @openai/codex
-    log_success "Codex CLI installed"
+    if command -v npm &> /dev/null; then
+        log_info "Installing Codex CLI..."
+        npm install -g @openai/codex
+        log_success "Codex CLI installed"
+    else
+        log_warning "SKIPPED: Codex CLI needs npm, which isn't installed yet"
+        log_info "Re-run this script after nvm, or: npm install -g @openai/codex"
+        record_failed_package "Codex CLI (needs npm)"
+    fi
 else
     log_success "Codex CLI already installed"
 fi

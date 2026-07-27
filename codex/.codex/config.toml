@@ -96,8 +96,8 @@ source_type = "local"
 source = "/Users/jeordin.callister/.codex/.tmp/bundled-marketplaces/openai-bundled"
 
 [marketplaces.claude-plugins-official]
-last_updated = "2026-07-21T14:55:24Z"
-last_revision = "9ddfad2e999789e0220cacaf359b64dd873e7d72"
+last_updated = "2026-07-26T21:31:33Z"
+last_revision = "4acf1a2a30144b9c426bc27d2c341507a91c3b33"
 source_type = "git"
 source = "https://github.com/anthropics/claude-plugins-official.git"
 
@@ -153,3 +153,6 @@ js_repl = false
 
 [hooks.state."/Users/jeordin.callister/.codex/hooks.json:stop:0:0"]
 trusted_hash = "sha256:8d29c14f64975ac6399d7dacbeec3a658ee4323d734b8ba4d8e44baffbfb2b22"
+
+[hooks.state."/Users/jeordin.callister/.codex/hooks.json:session_start:0:0"]
+trusted_hash = "sha256:eb1f4f49f832327e0940aac8d45289046446d6ce60c7ee0d69781756ac47679d"

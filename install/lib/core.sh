@@ -35,6 +35,32 @@ log_step() {
     echo "--------------------------------"
 }
 
+# Optional-package bookkeeping
+#
+# Not every tool exists in every OS's repos (yazi and lazygit aren't in apt, for
+# example). With `set -euo pipefail` a single missing package used to abort the
+# whole run, so everything after it — oh-my-zsh, p10k, TPM, stow — silently
+# never happened. Failures are collected here instead and reported at the end.
+FAILED_PACKAGES=()
+
+record_failed_package() {
+    FAILED_PACKAGES+=("$1")
+}
+
+report_failed_packages() {
+    if [ ${#FAILED_PACKAGES[@]} -eq 0 ]; then
+        return 0
+    fi
+
+    echo ""
+    log_warning "Not installed (unavailable via $PACKAGE_MANAGER):"
+    local pkg
+    for pkg in "${FAILED_PACKAGES[@]}"; do
+        echo "    - $pkg"
+    done
+    log_info "Everything else completed. Install these by hand if you need them."
+}
+
 # Error handling
 handle_error() {
     local exit_code=$1
@@ -149,6 +175,10 @@ print_completion_message() {
     echo "  $DOTFILES_DIR"
     echo ""
     echo "To uninstall, run:"
-    echo "  cd $DOTFILES_DIR && stow -D nvim tmux zsh ghostty"
+    if [[ "${OS_TYPE:-}" == "macos" ]]; then
+        echo "  cd $DOTFILES_DIR && stow -D nvim tmux zsh ghostty"
+    else
+        echo "  cd $DOTFILES_DIR && stow -D nvim tmux zsh"
+    fi
     echo ""
 }

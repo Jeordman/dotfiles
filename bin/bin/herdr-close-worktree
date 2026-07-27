@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# herdr-close-worktree — close the herdr workspace(s) belonging to a worktree.
+#
+# Usage: herdr-close-worktree [--label <slug>]... <worktree-path>...
+#
+# Callers: gtr-preremove (before `git gtr rm` deletes the files) and gtr-clean
+# (after the fact, when the directory is already gone). Always exits 0 — cleanup
+# is best-effort and must never block a caller.
+#
+# Matching, in order of trust:
+#   1. the workspace id dev-init-herdr recorded for the path — survives panes
+#      cd'ing out of the worktree and tabs being closed one by one,
+#   2. any workspace still holding a pane at/under the path,
+#   3. exact workspace-label match, but only for labels passed with --label.
+#      gtr-clean uses this for orphans whose panes and mapping are long gone;
+#      the automatic hook path deliberately doesn't, since a label collision
+#      there would kill an unrelated workspace with no one watching.
+#
+# The workspace running this command can't be closed out from under the caller,
+# so we name it and print the close command instead.
+#
+# Portable to bash 3.2 (default macOS /bin/bash).
+
+# Keep this path + filename encoding in sync with dev-init-herdr.
+MAP_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dev-init/herdr-workspaces"
+
+map_file_for() { printf '%s/%s' "$MAP_DIR" "$(printf '%s' "$1" | tr '/' '%')"; }
+
+labels=""
+paths=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --label) labels="$labels$2"$'\n'; shift 2 ;;
+    --label=*) labels="$labels${1#--label=}"$'\n'; shift ;;
+    -h|--help) sed -n '2,4p' "$0"; exit 0 ;;
+    *) paths="$paths$1"$'\n'; shift ;;
+  esac
+done
+
+command -v herdr >/dev/null 2>&1 || exit 0
+command -v jq >/dev/null 2>&1 || exit 0
+
+ws_list=$(herdr workspace list 2>/dev/null) || exit 0
+live=$(printf '%s' "$ws_list" | jq -r '.result.workspaces[]?.workspace_id' 2>/dev/null)
+[ -n "$live" ] || exit 0
+
+# Drop mappings whose workspace herdr no longer knows about, so the state dir
+# doesn't grow forever. Deliberately keyed on workspace liveness, not on whether
+# the worktree still exists — a mapping whose directory is gone but whose
+# workspace lives is exactly what gtr-clean needs to find an orphan.
+if [ -d "$MAP_DIR" ]; then
+  for f in "$MAP_DIR"/*; do
+    [ -f "$f" ] || continue
+    printf '%s\n' "$live" | grep -qx "$(cat "$f" 2>/dev/null)" || rm -f "$f"
+  done
+fi
+
+pane_list=$(herdr pane list 2>/dev/null)
+current_ws="${HERDR_PANE_ID%%:*}"
+
+# Closing a workspace makes herdr focus a neighbouring one, which yanks you out
+# of whatever tab you were working in — usually the very workspace that ran the
+# removal. Capture what was focused first (ws_list predates every close below)
+# so it can be restored afterwards. Deliberately keyed on the `focused` flag
+# rather than $HERDR_PANE_ID: the two normally agree, but the pane running this
+# hook isn't necessarily the pane you were looking at.
+focused_before=$(printf '%s' "$ws_list" | jq -r \
+  '.result.workspaces[]? | select(.focused == true) | .workspace_id' 2>/dev/null | head -1)
+
+candidates=""
+
+while IFS= read -r p; do
+  [ -n "$p" ] || continue
+  mf=$(map_file_for "$p")
+  [ -f "$mf" ] && candidates="$candidates$(cat "$mf" 2>/dev/null)"$'\n'
+  [ -n "$pane_list" ] && candidates="$candidates$(printf '%s' "$pane_list" | jq -r \
+    --arg path "$p" '
+      def under: . != null and (. == $path or startswith($path + "/"));
+      .result.panes[]?
+      | select((.cwd | under) or (.foreground_cwd | under))
+      | .workspace_id
+    ' 2>/dev/null)"$'\n'
+done <<< "$paths"
+
+while IFS= read -r l; do
+  [ -n "$l" ] || continue
+  candidates="$candidates$(printf '%s' "$ws_list" | jq -r \
+    --arg l "$l" '.result.workspaces[]? | select(.label == $l) | .workspace_id' 2>/dev/null)"$'\n'
+done <<< "$labels"
+
+closed=""
+for id in $(printf '%s\n' "$candidates" | sed '/^$/d' | sort -u); do
+  # A recorded mapping can outlive its workspace; ignore ids herdr forgot.
+  printf '%s\n' "$live" | grep -qx "$id" || continue
+
+  label=$(printf '%s' "$ws_list" | jq -r \
+    --arg id "$id" '.result.workspaces[]? | select(.workspace_id == $id) | .label // empty' 2>/dev/null)
+  [ -n "$label" ] || label="$id"
+
+  if [ -n "$current_ws" ] && [ "$id" = "$current_ws" ]; then
+    printf '  ! herdr workspace "%s" (%s) is the one running this command — left open.\n' "$label" "$id"
+    printf '      close it with: herdr workspace close %s\n' "$id"
+    continue
+  fi
+
+  printf '  → closing herdr workspace "%s" (%s)\n' "$label" "$id"
+  if herdr workspace close "$id" >/dev/null 2>&1; then
+    closed="$closed$id"$'\n'
+  else
+    printf '    warn: failed to close "%s" (%s)\n' "$label" "$id"
+  fi
+done
+
+# Put focus back where it was. Only meaningful if something actually closed and
+# the previously-focused workspace survived — if you were sitting in the
+# workspace being removed, herdr's move is the only sensible one.
+if [ -n "$closed" ] && [ -n "$focused_before" ] \
+   && ! printf '%s\n' "$closed" | grep -qx "$focused_before"; then
+  herdr workspace focus "$focused_before" >/dev/null 2>&1 \
+    || printf '    warn: could not restore focus to %s\n' "$focused_before"
+fi
+
+# Forget the mappings we actually acted on. Anything left open (the caller's own
+# workspace) keeps its mapping until the workspace itself goes away.
+while IFS= read -r p; do
+  [ -n "$p" ] || continue
+  mf=$(map_file_for "$p")
+  [ -f "$mf" ] || continue
+  printf '%s\n' "$closed" | grep -qx "$(cat "$mf" 2>/dev/null)" && rm -f "$mf"
+done <<< "$paths"
+
+exit 0

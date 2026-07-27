@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+# deploy-watch — wait for a pushed commit's Vercel preview to finish building,
+# then hand off to the local verification session.
+#
+# The hinge of the unattended workflow: nothing moves from the cloud phase to
+# the local phase without it.
+#
+# Why GitHub commit statuses rather than the Vercel API:
+#   * They are SHA-exact. The per-branch alias URL always points at the LATEST
+#     build for that branch, so polling the alias can report ready while it is
+#     still serving the previous build — you would then verify the wrong code
+#     and get a false pass. Statuses are attached to the commit we pushed.
+#   * `gh` is already authenticated, so no VERCEL_TOKEN has to be created,
+#     stored, or rotated.
+#   * The Vercel MCP is only reachable from inside a Claude session, not from a
+#     shell. Resolving the preview URL is therefore left to the verify session.
+#
+# Gotchas encoded here, both verified 2026-07-25:
+#   * Five Vercel projects post a status per commit (shop2, shop-api,
+#     shop2-storybook, new-shop-enroll, new-shop-design-previews). Matching any
+#     "Vercel" context gives false readiness from a sibling project, so the
+#     context is matched exactly.
+#   * That context name uses an EN DASH (U+2013), not a hyphen.
+#
+# Exit codes are the contract with the caller:
+#   0  the commit's preview built successfully
+#   2  the build failed or errored
+#   3  timed out with no terminal status
+#   4  usage or environment problem
+#
+# It never exits silently on a bad outcome: a timeout and a failure are both
+# reported, because for an unattended run silence is indistinguishable from
+# "still working".
+
+set -uo pipefail
+
+REPO="Unicity/new-shop"
+CONTEXT="Vercel – shop2"     # en dash
+SHA=""
+INTERVAL=20
+TIMEOUT=1800
+QUIET=false
+
+usage() {
+  cat <<'USAGE'
+deploy-watch [options]
+  -r <owner/repo>   repository            (default Unicity/new-shop)
+  -c <context>      commit-status context (default "Vercel – shop2")
+  -s <sha>          commit to watch       (default HEAD)
+  -i <seconds>      poll interval         (default 20)
+  -t <seconds>      timeout               (default 1800)
+  -q                only print the final line
+Exit: 0 ready · 2 failed · 3 timeout · 4 usage/env
+USAGE
+}
+
+while getopts "r:c:s:i:t:qh" opt; do
+  case $opt in
+    r) REPO="$OPTARG" ;;
+    c) CONTEXT="$OPTARG" ;;
+    s) SHA="$OPTARG" ;;
+    i) INTERVAL="$OPTARG" ;;
+    t) TIMEOUT="$OPTARG" ;;
+    q) QUIET=true ;;
+    h) usage; exit 0 ;;
+    *) usage; exit 4 ;;
+  esac
+done
+
+command -v gh >/dev/null 2>&1 || { echo "deploy-watch: gh not found"; exit 4; }
+command -v jq >/dev/null 2>&1 || { echo "deploy-watch: jq not found"; exit 4; }
+
+if [ -z "$SHA" ]; then
+  SHA=$(git rev-parse HEAD 2>/dev/null) || { echo "deploy-watch: not a git repo and no -s given"; exit 4; }
+fi
+
+say() { [ "$QUIET" = true ] || printf '%s\n' "$*"; }
+
+# Refuse to watch a commit the remote has never seen — otherwise we would poll
+# for 30 minutes for a status that can never appear.
+if ! gh api "repos/$REPO/commits/$SHA" --jq '.sha' >/dev/null 2>&1; then
+  echo "deploy-watch: $SHA is not on $REPO — push before watching. FAILED"
+  exit 4
+fi
+
+say "deploy-watch: $REPO @ ${SHA:0:8}"
+say "deploy-watch: waiting for \"$CONTEXT\" (interval ${INTERVAL}s, timeout ${TIMEOUT}s)"
+
+ELAPSED=0
+LAST=""
+while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
+  # Newest status wins: GitHub returns them most-recent-first, so take the
+  # first match rather than folding over all of them.
+  # Piped to jq rather than using `gh --jq`: gh's --jq takes the filter as its
+  # own next argument and does not forward jq flags, so `--jq --arg c …` silently
+  # ran the filter "--arg" and returned empty on every poll. That failure mode is
+  # invisible — it reads as an eternally pending build. (Found in test, 2026-07-25.)
+  STATE=$(gh api "repos/$REPO/commits/$SHA/status" 2>/dev/null \
+            | jq -r --arg c "$CONTEXT" '[.statuses[] | select(.context == $c)] | .[0].state // ""' \
+            2>/dev/null || echo "")
+
+  case "$STATE" in
+    success)
+      say "deploy-watch: build succeeded after ${ELAPSED}s"
+      echo "READY $SHA"
+      exit 0
+      ;;
+    failure|error)
+      say "deploy-watch: build $STATE after ${ELAPSED}s"
+      echo "FAILED $SHA $STATE"
+      exit 2
+      ;;
+    pending|"")
+      if [ "$STATE" != "$LAST" ]; then
+        say "deploy-watch: ${STATE:-no status yet} (${ELAPSED}s)"
+        LAST="$STATE"
+      fi
+      ;;
+  esac
+
+  sleep "$INTERVAL"
+  ELAPSED=$((ELAPSED + INTERVAL))
+done
+
+echo "TIMEOUT $SHA after ${TIMEOUT}s with no terminal status"
+exit 3

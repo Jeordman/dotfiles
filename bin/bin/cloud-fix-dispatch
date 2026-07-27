@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+# cloud-fix-dispatch — send a DIAGNOSED failure back to the cloud to be fixed.
+#
+# Usage: cloud-fix-dispatch <findings-file> [-n]
+#
+# The second half of cloud-always. Local verification finds the break, diagnoses
+# it with a browser, and dispatches the typing — it never edits source itself.
+#
+# Why the local side must diagnose rather than just say "it's broken": the cloud
+# session has no browser and cannot reach the preview, so it can only ever see
+# the code. A fresh session handed "cart total is wrong" re-derives the cause
+# blind, which is the one thing this split exists to avoid. The findings file has
+# to name the root cause and the file:line, not the symptom.
+#
+# The findings file is committed and pushed BEFORE dispatch. `--cloud` clones
+# from GitHub and never from your disk, so an uncommitted findings file is
+# invisible to the session that needs it. It is written under .claude/state/ and
+# that path is gitignored in this repo, so the commit is scoped with -f.
+#
+# Records the pre-dispatch remote SHA so the caller can wait for exactly this
+# session's push:
+#
+#   OLD=$(jq -r .baseline .claude/state/cloud-fix-<branch>.json)
+#   NEW=$(wait-for-push -s "$OLD") && deploy-watch -s "$NEW"
+#
+# Exit codes:
+#   0  dispatched
+#   2  precondition failed
+
+set -uo pipefail
+
+PROTECTED_RE='^(master|main|staging|production|release|develop)$'
+DRY=false
+FINDINGS=""
+
+usage() {
+  cat <<'USAGE'
+cloud-fix-dispatch <findings-file> [-n]
+  <findings-file>  root cause + file:line + what to change + how to re-verify
+  -n               dry run: check everything, change nothing, dispatch nothing
+Exit: 0 dispatched · 2 precondition failed
+USAGE
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -n) DRY=true ;;
+    -h|--help) usage; exit 0 ;;
+    *) FINDINGS="$1" ;;
+  esac
+  shift
+done
+
+[ -n "$FINDINGS" ] || { usage; exit 2; }
+
+die() { echo "cloud-fix-dispatch: $1" >&2; exit 2; }
+
+command -v git >/dev/null || die "git not found"
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || die "not inside a git repository"
+[ -f "$FINDINGS" ] || die "findings file not found: $FINDINGS"
+[ -s "$FINDINGS" ] || die "findings file is empty: $FINDINGS — dispatching without a diagnosis wastes a full round trip"
+
+BRANCH=$(git branch --show-current 2>/dev/null)
+[ -n "$BRANCH" ] || die "detached HEAD — check out the feature branch first"
+printf '%s' "$BRANCH" | grep -qE "$PROTECTED_RE" && \
+  die "refusing to dispatch from protected branch '$BRANCH'"
+
+git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1 \
+  || die "branch '$BRANCH' is not on origin — dispatch the ticket first"
+
+BASELINE=$(git ls-remote origin "refs/heads/$BRANCH" 2>/dev/null | awk 'NR==1{print $1}')
+[ -n "$BASELINE" ] || die "could not read origin/$BRANCH tip"
+
+REL=$(python3 -c 'import os,sys; print(os.path.relpath(os.path.abspath(sys.argv[1]), sys.argv[2]))' \
+        "$FINDINGS" "$ROOT" 2>/dev/null || basename "$FINDINGS")
+
+echo "cloud-fix-dispatch"
+echo "  branch:   $BRANCH"
+echo "  findings: $REL"
+echo "  baseline: $(printf '%s' "$BASELINE" | cut -c1-9)"
+
+if [ "$DRY" = true ]; then
+  echo "  DRY RUN — no commit, no push, no dispatch"
+  exit 0
+fi
+
+# Commit the findings so the VM can read them. -f because .claude/state/ is
+# gitignored; scoped to this one path so nothing else is swept in.
+if [ -n "$(git status --porcelain --ignored -- "$FINDINGS" 2>/dev/null)" ]; then
+  git add -f -- "$FINDINGS" || die "could not stage $REL"
+  git commit -q -m "chore: verification findings for cloud fix
+
+Browser evidence and root cause from local preview verification. Committed so
+the cloud session can read it; the VM clones from GitHub, not from local disk." \
+    -- "$FINDINGS" || die "could not commit $REL"
+  echo "  committed the findings"
+fi
+
+git push -u origin HEAD >/dev/null 2>&1 || die "push failed — resolve manually, then re-run"
+
+# The push above moved the tip, so re-read the baseline. Waiting against the
+# pre-commit SHA would return immediately on our own findings commit.
+BASELINE=$(git ls-remote origin "refs/heads/$BRANCH" 2>/dev/null | awk 'NR==1{print $1}')
+echo "  pushed; new baseline $(printf '%s' "$BASELINE" | cut -c1-9)"
+
+PROMPT="A feature on branch $BRANCH failed verification against its deployed Vercel preview. Fix it.
+
+The diagnosis is already done — read $REL in the repo. It contains the root cause, the file and line, what to change, and how it was verified. It was written by a session that drove a real browser against the deployed preview, which you cannot do, so treat it as the authoritative account of the failure rather than re-deriving it.
+
+Implement the fix it describes. If the findings are wrong or incomplete, say so in your commit message and fix the actual root cause — do not implement something you believe is wrong, and do not paper over the symptom.
+
+Follow the repo's conventions: read CLAUDE.md and .claude/rules/ and match the surrounding code. Keep the change as small as the fix allows.
+
+Do not stop to ask questions — nobody is watching this session.
+
+Run the cheap gates and fix what they report: pnpm tsc, pnpm formatAndLint, pnpm fallow audit. Do NOT run a production build and do NOT attempt browser verification; neither is available here. Re-verification happens locally against the next preview deployment.
+
+Commit and push to $BRANCH. Do NOT open a pull request. Put in the commit message body what you changed and why, plus anything in the findings you disagreed with. That message is the only channel back — this session's output cannot be read from a terminal.
+
+Never claim something works that you did not exercise."
+
+OUT=$(script -q /dev/null claude --permission-mode bypassPermissions --cloud "$PROMPT" 2>&1)
+CLEAN=$(printf '%s' "$OUT" | sed -e 's/\x1b\[[0-9;?]*[a-zA-Z]//g' -e 's/\r/\n/g')
+URL=$(printf '%s' "$CLEAN" | grep -oE 'https://claude\.ai/code/session_[A-Za-z0-9]+' | head -1)
+
+if [ -z "$URL" ]; then
+  echo "  DISPATCH FAILED — output follows" >&2
+  printf '%s\n' "$CLEAN" | grep -vE '^\s*$' | head -20 >&2
+  exit 2
+fi
+
+SAFE_BRANCH=$(printf '%s' "$BRANCH" | tr '/' '-' | tr -cd '[:alnum:]._-')
+STATE="$ROOT/.claude/state/cloud-fix-${SAFE_BRANCH}.json"
+mkdir -p "$ROOT/.claude/state" 2>/dev/null || true
+printf '{"session":"%s","branch":"%s","findings":"%s","baseline":"%s"}\n' \
+  "$URL" "$BRANCH" "$REL" "$BASELINE" > "$STATE" 2>/dev/null || true
+
+cat <<EOF
+
+  dispatched: $URL
+
+  Wait for it, then re-verify — do not edit source locally:
+
+    NEW=\$(wait-for-push -s $BASELINE) && deploy-watch -s "\$NEW"
+
+EOF

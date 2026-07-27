@@ -169,6 +169,7 @@ main() {
         verify_installation
     fi
 
+    report_failed_packages
     print_completion_message
 }
 

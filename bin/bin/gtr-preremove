@@ -42,36 +42,15 @@ cmux_cleanup() {
   done <<< "$hits"
 }
 
-# --- herdr: match workspaces that own a pane whose cwd is at/under WORKTREE_PATH ---
-# herdr's `workspace list` has no directory field, so we key off pane cwd instead.
-# Pane ids look like "wA:p1"; the workspace id is the part before the colon, which
-# is also how we identify the current workspace to skip (from $HERDR_PANE_ID).
+# --- herdr: delegate to herdr-close-worktree (shared with gtr-clean) ---
+# Note this only runs when gtr gets far enough to fire hooks. If the worktree
+# directory is already gone, `git gtr rm` fails with "Worktree not found" before
+# any hook runs — use `gtr-clean <branch>` to mop up in that case.
 herdr_cleanup() {
-  command -v herdr >/dev/null 2>&1 || return 0
-
-  pane_list=$(herdr pane list 2>/dev/null) || return 0
-  [ -n "$pane_list" ] || return 0
-
-  current_ws="${HERDR_PANE_ID%%:*}"
-
-  ws_ids=$(printf '%s' "$pane_list" | jq -r \
-    --arg path "$WORKTREE_PATH" \
-    --arg cur "$current_ws" '
-      .result.panes[]?
-      | select(.cwd != null)
-      | select(.cwd == $path or (.cwd | startswith($path + "/")))
-      | .workspace_id
-      | select(. != $cur)
-    ' 2>/dev/null | sort -u)
-
-  [ -n "$ws_ids" ] || return 0
-
-  while read -r id; do
-    [ -n "$id" ] || continue
-    printf '  → closing herdr workspace %s\n' "$id"
-    herdr workspace close "$id" >/dev/null 2>&1 \
-      || printf '    warn: failed to close %s\n' "$id"
-  done <<< "$ws_ids"
+  helper=$(command -v herdr-close-worktree 2>/dev/null) \
+    || helper="$(dirname "$0")/herdr-close-worktree"
+  [ -x "$helper" ] || return 0
+  "$helper" "$WORKTREE_PATH"
 }
 
 cmux_cleanup

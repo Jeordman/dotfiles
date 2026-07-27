@@ -121,7 +121,81 @@ ensure_package() {
         return 0
     fi
 
-    install_package "$package_name" "$display_name"
+    if install_package "$package_name" "$display_name"; then
+        return 0
+    fi
+
+    # Deliberately non-fatal. Modules call this unguarded at top level, and the
+    # installer runs under `set -e`, so returning non-zero here would kill the
+    # entire run over one package that simply isn't in this distro's repos.
+    record_failed_package "$display_name"
+    return 0
+}
+
+# Debian and Ubuntu rename a couple of binaries to avoid clashing with older
+# packages: bat ships as `batcat`, fd ships as `fdfind`. Symlink the expected
+# name into ~/.local/bin, which .zshrc already has on PATH.
+link_debian_binary_alias() {
+    local expected=$1
+    local actual=$2
+
+    [[ "$PACKAGE_MANAGER" == "apt" ]] || return 0
+    command -v "$expected" &> /dev/null && return 0
+    command -v "$actual" &> /dev/null || return 0
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[DRY RUN] Would link $expected -> $actual in ~/.local/bin"
+        return 0
+    fi
+
+    mkdir -p "$HOME/.local/bin"
+    ln -sf "$(command -v "$actual")" "$HOME/.local/bin/$expected"
+    log_success "Linked $expected -> $actual in ~/.local/bin"
+}
+
+# Install a GitHub release tarball for tools with no apt package (lazygit, yazi).
+# Expects the archive to contain the binary at the top level.
+install_from_github_release() {
+    local repo=$1
+    local binary=$2
+    local asset_pattern=$3
+    local display_name=${4:-$binary}
+
+    if command -v "$binary" &> /dev/null; then
+        log_success "$display_name already installed"
+        return 0
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[DRY RUN] Would install $display_name from github.com/$repo releases"
+        return 0
+    fi
+
+    local url
+    url=$(curl -fsSL "https://api.github.com/repos/$repo/releases/latest" \
+        | grep -o "\"browser_download_url\": *\"[^\"]*${asset_pattern}[^\"]*\"" \
+        | head -1 | cut -d'"' -f4) || true
+
+    if [[ -z "$url" ]]; then
+        log_warning "Could not find a $display_name release asset matching '$asset_pattern'"
+        record_failed_package "$display_name"
+        return 0
+    fi
+
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    mkdir -p "$HOME/.local/bin"
+
+    if curl -fsSL "$url" -o "$tmpdir/asset.tar.gz" \
+        && tar -xzf "$tmpdir/asset.tar.gz" -C "$tmpdir" \
+        && find "$tmpdir" -name "$binary" -type f -perm -u+x -exec install -m 755 {} "$HOME/.local/bin/$binary" \; ; then
+        log_success "$display_name installed to ~/.local/bin"
+    else
+        log_warning "Failed to install $display_name from GitHub releases"
+        record_failed_package "$display_name"
+    fi
+
+    rm -rf "$tmpdir"
 }
 
 # Install cask application (macOS only)

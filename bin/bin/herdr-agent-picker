@@ -12,14 +12,53 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 sel=$(
   herdr agent list \
-    | jq -r '.result.agents[]
-        | [ (if .focused then "●" else "○" end) + " " + .agent_status,
+    | jq -r --arg home "$HOME" '
+        .result.agents[]
+        | [ (if .focused then "●" else "○" end),
+            .agent_status,
             .terminal_title_stripped,
-            .cwd,
+            (.cwd | if startswith($home) then "~" + .[($home|length):] else . end),
             .pane_id ]
         | @tsv' \
-    | fzf --delimiter='\t' \
-          --with-nth=1,2,3 \
+    | awk -F'\t' '
+        # Kanagawa-ish palette. Only rows that WANT something from you get
+        # colour; everything else recedes to grey so the live ones pop.
+        #   blocked -> peachRed   (permission prompt: unblock me now)
+        #   idle    -> roninYellow (waiting on your input)
+        #   done    -> springGreen (finished, go look)
+        #   working -> grey        (leave it alone)
+        BEGIN {
+          E   = "\033[0m"
+          DIM = "\033[38;2;114;113;105m"   # fujiGray
+          FG  = "\033[38;2;220;215;186m"   # fujiWhite
+          c["blocked"] = "\033[1;38;2;255;93;98m"
+          c["idle"]    = "\033[38;2;255;158;59m"
+          c["done"]    = "\033[38;2;152;187;108m"
+          c["working"] = DIM
+          c["unknown"] = DIM
+        }
+        # Pass 1: stash rows, track the widest status + title so columns align.
+        {
+          icon[NR]=$1; st[NR]=$2; title[NR]=$3; cwd[NR]=$4; pid[NR]=$5
+          if (length($2) > w1) w1 = length($2)
+          tl = length($3); if (tl > 55) tl = 55
+          if (tl > w2) w2 = tl
+        }
+        # Pass 2: pad on the PLAIN text, wrap the colour around it afterwards,
+        # then emit a single display field + tab + pane_id.
+        END {
+          fmt = "%s%s %-" w1 "s" E "  %s%-" w2 "s" E "  " DIM "%s" E "\t%s\n"
+          for (i = 1; i <= NR; i++) {
+            t = title[i]
+            if (length(t) > 55) t = substr(t, 1, 54) "…"
+            sc = (st[i] in c) ? c[st[i]] : DIM
+            tc = (sc == DIM) ? DIM : FG        # whole row recedes when nothing is wanted
+            printf fmt, sc, icon[i], st[i], tc, t, cwd[i], pid[i]
+          }
+        }' \
+    | fzf --ansi \
+          --delimiter='\t' \
+          --with-nth=1 \
           --reverse \
           --header='NORMAL — j/k move · g/G top/bottom · / search · enter focus · esc quit' \
           --bind 'start:hide-input+disable-search' \
@@ -32,4 +71,4 @@ sel=$(
 ) || exit 0
 
 [ -n "${sel:-}" ] || exit 0
-printf '%s' "$sel" | cut -f4 | xargs herdr agent focus >/dev/null
+printf '%s' "$sel" | cut -f2 | xargs herdr agent focus >/dev/null

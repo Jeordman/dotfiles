@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# gtrc — create a worktree in CLOUD mode.
+#
+#   gtrc feat/ECOM-1234-thing      # identical to `git gtr new`, but the
+#                                  # postCreate hook builds a cloud-mode
+#                                  # workspace instead of a local dev one
+#
+# Sets GTR_CLOUD=1, which gtr-postcreate reads to choose dev-cloud over
+# dev-init. gtr hooks inherit the environment of the `git gtr` invocation, so an
+# env var is the only channel available — gtr's postCreate hook takes no flags.
+#
+# Deliberately a script rather than a shell function: it works from any shell,
+# from scripts, and from a Claude session, and it keeps .zshrc untouched.
+
+set -uo pipefail
+
+if [ $# -eq 0 ]; then
+  cat <<'USAGE'
+gtrc <branch> [gtr-new-options...]
+  Creates a worktree whose workspace is set up for cloud execution:
+  no dev server, dependencies pre-warmed, and a pane for watching the branch.
+
+  Local mode is unchanged — keep using `git gtr new` for that.
+USAGE
+  exit 2
+fi
+
+exec env GTR_CLOUD=1 git gtr new "$@"

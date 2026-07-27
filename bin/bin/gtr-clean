@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+# gtr-clean — mop up after a worktree that's already gone.
+#
+# `git gtr rm <branch>` fails with "Worktree not found for branch: ..." once the
+# directory has been deleted by hand, and it fails *before* firing its hooks. So
+# the herdr workspace, the stale `git worktree list` registration and the local
+# branch all linger with no command to clear them. This is that command.
+#
+# Usage:
+#   gtr-clean                  # sweep every stale worktree in this repo
+#   gtr-clean <branch>...      # clean up specific branches
+#   gtr-clean --yes [...]      # skip the confirmation prompt
+#
+# Per branch: close its herdr workspace, prune the stale registration, delete
+# the local branch. Worktrees that still exist on disk are left alone — use
+# `git gtr rm` for those so gtr's own hooks run.
+
+set -uo pipefail
+
+ASSUME_YES=false
+BRANCHES=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --yes|-y) ASSUME_YES=true; shift ;;
+    -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
+    -*) printf 'gtr-clean: unknown option %s\n' "$1" >&2; exit 2 ;;
+    *) BRANCHES="$BRANCHES$1"$'\n'; shift ;;
+  esac
+done
+
+git rev-parse --git-dir >/dev/null 2>&1 || {
+  echo "gtr-clean: not inside a git repository" >&2; exit 1; }
+
+COMMON_DIR=$(git rev-parse --git-common-dir)
+case "$COMMON_DIR" in
+  /*) ;;
+  *) COMMON_DIR="$(cd "$COMMON_DIR" && pwd)" ;;
+esac
+REPO_ROOT=$(dirname "$COMMON_DIR")
+
+# Path gtr would have used: <parent>/<repo>-worktrees/<branch with / -> ->.
+derive_path() {
+  printf '%s/%s-worktrees/%s' \
+    "$(dirname "$REPO_ROOT")" "$(basename "$REPO_ROOT")" "$(printf '%s' "$1" | tr '/' '-')"
+}
+
+# Workspace label dev-init-herdr would have given it — the branch slug minus the
+# "<type>-<TICKET>-" prefix. Keep in sync with dev-init-herdr's SESSION_NAME.
+derive_label() {
+  printf '%s' "$1" | tr '/' '-' | sed -E 's/^new-shop-//; s/^([a-z]+-)?[A-Z]+-[0-9]+-//'
+}
+
+registered_path() {
+  git worktree list --porcelain | awk -v want="branch refs/heads/$1" '
+    /^worktree /{p = substr($0, 10)}
+    $0 == want {print p; exit}
+  '
+}
+
+# "<path>\t<branch or empty>" for every worktree git has flagged prunable.
+stale_worktrees() {
+  git worktree list --porcelain | awk '
+    /^worktree /{p = substr($0, 10); b = ""; pr = 0}
+    /^branch /{b = substr($0, 8); sub(/^refs\/heads\//, "", b)}
+    /^prunable/{pr = 1}
+    /^$/{if (pr && p != "") print p "\t" b; p = ""; b = ""; pr = 0}
+    END{if (pr && p != "") print p "\t" b}
+  '
+}
+
+# Build the plan as "<path>\t<branch>" lines. Path first and never empty: tab is
+# IFS *whitespace*, so `read` collapses a leading empty field and a branchless
+# (detached) entry would otherwise shift the path into the wrong variable.
+plan=""
+if [ -n "$BRANCHES" ]; then
+  while IFS= read -r b; do
+    [ -n "$b" ] || continue
+    p=$(registered_path "$b")
+    [ -n "$p" ] || p=$(derive_path "$b")
+    if [ -d "$p" ]; then
+      printf '  · %s still exists — use: git gtr rm %s\n' "$p" "$b"
+      continue
+    fi
+    plan="$plan$p"$'\t'"$b"$'\n'
+  done <<< "$BRANCHES"
+else
+  while IFS=$'\t' read -r p b; do
+    [ -n "$p" ] || continue
+    if [ -d "$p" ]; then
+      printf '  · %s still exists — skipped (git worktree prune would drop it)\n' "$p"
+      continue
+    fi
+    plan="$plan$p"$'\t'"$b"$'\n'
+  done <<< "$(stale_worktrees)"
+fi
+
+plan=$(printf '%s' "$plan" | sed '/^[[:space:]]*$/d')
+if [ -z "$plan" ]; then
+  # Anything skipped above needs nothing but a prune, which is safe on its own.
+  echo "gtr-clean: no workspace or branch to clean — run 'git worktree prune' for any registration listed above"
+  exit 0
+fi
+
+echo "Will clean up:"
+while IFS=$'\t' read -r p b; do
+  [ -n "$p" ] || continue
+  if [ -n "$b" ]; then
+    printf '  %s\n    worktree %s\n' "$(derive_label "$b")" "$p"
+    # Only promise a branch delete if the branch is actually still there.
+    git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$b" \
+      && printf '    branch   %s\n' "$b"
+  else
+    printf '  (detached)\n    worktree %s\n' "$p"
+  fi
+done <<< "$plan"
+
+if [ "$ASSUME_YES" != true ]; then
+  [ -e /dev/tty ] || { echo "gtr-clean: no tty — re-run with --yes" >&2; exit 1; }
+  printf 'Proceed? [y/N] ' > /dev/tty
+  read -r reply < /dev/tty || reply=""
+  case "$reply" in
+    y|Y|yes|YES) ;;
+    *) echo "aborted"; exit 0 ;;
+  esac
+fi
+
+# Close herdr workspaces first, while we still know which branch owned what.
+# Label matching is safe here: the user named the branch and every close is
+# printed. Passing the path too lets a recorded mapping win when there is one.
+closer=$(command -v herdr-close-worktree 2>/dev/null) \
+  || closer="$(dirname "$0")/herdr-close-worktree"
+if [ -x "$closer" ]; then
+  while IFS=$'\t' read -r p b; do
+    [ -n "$p" ] || continue
+    if [ -n "$b" ]; then
+      "$closer" --label "$(derive_label "$b")" "$p"
+    else
+      "$closer" "$p"
+    fi
+  done <<< "$plan"
+fi
+
+if out=$(git -C "$REPO_ROOT" worktree prune -v 2>&1); then
+  [ -n "$out" ] && printf '  → pruned stale worktree registrations\n'
+else
+  printf '    warn: git worktree prune failed: %s\n' "$out"
+fi
+
+# Reuse the postRemove hook so branch deletion has identical semantics
+# (protected names, missing-branch skip). The plan was already confirmed above,
+# so don't prompt a second time.
+remover=$(command -v gtr-postremove 2>/dev/null) \
+  || remover="$(dirname "$0")/gtr-postremove"
+if [ -x "$remover" ]; then
+  while IFS=$'\t' read -r p b; do
+    [ -n "$b" ] || continue
+    BRANCH="$b" REPO_ROOT="$REPO_ROOT" GTR_AUTO_DELETE_BRANCH=1 "$remover"
+  done <<< "$plan"
+fi
+
+exit 0

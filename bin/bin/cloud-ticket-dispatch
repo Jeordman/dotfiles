@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+# cloud-ticket-dispatch — hand a ticket to a cloud session. That is all it does.
+#
+# Usage: cloud-ticket-dispatch <TICKET> [-n]
+#
+# Deliberately minimal (decided 2026-07-26, after the elaborate version was
+# built and measured). The earlier design researched the ticket locally, wrote a
+# goal-plan with a ledger and a Verification Contract, committed it so the VM
+# could read it, and embedded an execution protocol in the file. All of that was
+# dropped for two reasons that survived testing:
+#
+#   1. It was unverifiable. Six dispatch probes across two repos produced zero
+#      observable side effects, and a cloud session cannot be watched from a
+#      terminal. A 200-line contract and a 20-line prompt are equally unenforced
+#      from here, so the contract only bought the appearance of control.
+#   2. It was expensive in the wrong place. Local research spends *your* context
+#      to brief a session that can clone the repo and read the ticket itself.
+#
+# What is kept are the two guards that cost nothing and prevent silent wrong
+# work, because `--cloud` clones from GitHub rather than from your disk:
+#   * refuse to dispatch from a protected branch (the session commits to
+#     whatever branch it cloned)
+#   * prove the branch exists on the remote AFTER pushing — a silently failed
+#     push otherwise means the VM builds on stale code and returns a confusing
+#     result you would debug as a code problem
+#
+# The pty wrapper stays: `claude --cloud` refuses to run without a TTY —
+# "Non-interactive invocations run locally and would silently ignore --cloud" —
+# and a Claude session's Bash tool has no TTY. `script -q /dev/null` supplies
+# one, and is harmless when this is run from a real terminal, so one
+# implementation serves both callers.
+#
+# Note the flag order: --permission-mode must come BEFORE --cloud. Reversed, it
+# fails with "--cloud requires a description".
+#
+# Verification does NOT happen here. When the branch deploys, verify locally:
+#   deploy-watch -s <sha> && claude-unattended
+
+set -uo pipefail
+
+PROTECTED_RE='^(master|main|staging|production|release|develop)$'
+DRY=false
+TICKET=""
+
+usage() {
+  cat <<'USAGE'
+cloud-ticket-dispatch <TICKET> [-n]
+  <TICKET>   ticket id, e.g. ECOM-1234 (the cloud session reads it from ClickUp)
+  -n         dry run: check everything, change nothing, dispatch nothing
+Exit: 0 dispatched · 2 precondition failed
+USAGE
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -n) DRY=true ;;
+    -h|--help) usage; exit 0 ;;
+    *) TICKET="$1" ;;
+  esac
+  shift
+done
+
+[ -n "$TICKET" ] || { usage; exit 2; }
+
+die() { echo "cloud-ticket-dispatch: $1" >&2; exit 2; }
+
+command -v git >/dev/null || die "git not found"
+git rev-parse --show-toplevel >/dev/null 2>&1 || die "not inside a git repository"
+
+BRANCH=$(git branch --show-current 2>/dev/null)
+[ -n "$BRANCH" ] || die "detached HEAD — check out a feature branch first"
+printf '%s' "$BRANCH" | grep -qE "$PROTECTED_RE" && \
+  die "refusing to dispatch from protected branch '$BRANCH' — the cloud session commits to whatever branch it clones. Run 'gtrc $TICKET' first."
+
+echo "cloud-ticket-dispatch"
+echo "  ticket: $TICKET"
+echo "  branch: $BRANCH"
+
+if [ "$DRY" = true ]; then
+  echo "  DRY RUN — no push, no dispatch"
+  exit 0
+fi
+
+# Push, then PROVE the branch is on the remote.
+git push -u origin HEAD >/dev/null 2>&1 || die "push failed — resolve manually, then re-run"
+git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1 \
+  || die "branch '$BRANCH' is not on the remote after push — refusing to dispatch"
+echo "  pushed and confirmed on origin"
+
+# The prompt is now the ONLY steering this run gets. Everything the session
+# cannot discover for itself has to be in here.
+PROMPT="Implement ticket $TICKET on the current branch ($BRANCH).
+
+Read the ticket from ClickUp first — the description AND the comments. On this team the real requirements are often in the comments rather than the description.
+
+Follow the repo's own conventions: read CLAUDE.md and .claude/rules/ before writing code, and match the patterns already in the files you touch rather than introducing new ones. Prefer the smallest change that satisfies the ticket.
+
+Do not stop to ask questions — nobody is watching this session. When something is genuinely ambiguous, pick the reading a careful colleague would pick, prefer the reversible option, and record the call instead of pausing on it.
+
+Gates available here, cheapest first: pnpm tsc, pnpm formatAndLint, pnpm fallow audit. Run them and fix what they report.
+
+Do NOT run a production build and do NOT attempt browser or Playwright verification. Neither is available in this environment. The feature is verified locally against the deployed Vercel preview after you push, so getting the branch pushed and green on the cheap gates is the whole job here.
+
+Commit in logical units and push to $BRANCH. Do NOT open a pull request — that is deliberate. The human opens it after verifying the feature locally against the deployed preview.
+
+Nobody can read this session's output from a terminal, so git is the only channel back. Everything the human needs must be in the COMMIT MESSAGE BODY of your final commit:
+  * an 'Assumptions:' block, one line per judgment call you made
+  * anything you could not finish, and why
+  * if the change touches checkout submission, payments, or auth, say so prominently — it needs human eyes before merge
+
+Never claim something works that you did not exercise. Untested is a fine thing to write down; a false pass is not."
+
+OUT=$(script -q /dev/null claude --permission-mode bypassPermissions --cloud "$PROMPT" 2>&1)
+CLEAN=$(printf '%s' "$OUT" | sed -e 's/\x1b\[[0-9;?]*[a-zA-Z]//g' -e 's/\r/\n/g')
+URL=$(printf '%s' "$CLEAN" | grep -oE 'https://claude\.ai/code/session_[A-Za-z0-9]+' | head -1)
+
+if [ -z "$URL" ]; then
+  echo "  DISPATCH FAILED — output follows" >&2
+  printf '%s\n' "$CLEAN" | grep -vE '^\s*$' | head -20 >&2
+  exit 2
+fi
+
+cat <<EOF
+
+  dispatched: $URL
+
+  Manage it there — cloud sessions cannot be tracked from the terminal.
+  You get a native notification when it finishes. Then, locally:
+
+    git fetch
+    git log origin/$BRANCH               # assumptions live in the commit bodies
+    deploy-watch -s \$(git rev-parse origin/$BRANCH)
+    claude-unattended                    # drives Playwright against the preview
+
+  No PR is opened by the cloud session — you open it after it verifies.
+
+EOF

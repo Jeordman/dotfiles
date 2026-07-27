@@ -112,7 +112,9 @@ nvm() {  # first call swaps this stub for the real nvm, then runs your command
 # $HOME and everything inside it, so new ones are ignored automatically without being listed.
 # Real repos (new-shop, global-cms, UFeelGreat, ...) are unaffected.
 export _ZO_EXCLUDE_DIRS="$HOME/**/*-worktrees:$HOME/**/*-worktrees/**"
-eval "$(zoxide init zsh)"
+# Guarded like fzf/direnv below — on a box where zoxide didn't install, an
+# unguarded eval prints an error on every single new shell.
+command -v zoxide >/dev/null && eval "$(zoxide init zsh)"
 
 # Yazi change directory on exit
 function y() {
@@ -133,7 +135,12 @@ alias multipull="find . -mindepth 1 -maxdepth 1 -type d ! -name '.*' -print -exe
 # alias multimain='find . -mindepth 1 -maxdepth 1 -type d -print -exec sh -c '\''cd "$1" && (git checkout main 2>/dev/null || git checkout master)'\'' _ {} \;'
 # alias multi='multimain && multipull'
 alias multi='multipull'
-alias l="eza --icons --group-directories-first --no-filesize"
+# chpwd() below runs `l` after every cd, so this must never be a missing command.
+if command -v eza >/dev/null; then
+  alias l="eza --icons --group-directories-first --no-filesize"
+else
+  alias l="ls -lh --color=auto"
+fi
 alias zhome='for dir in ~/*/; do zoxide add "$dir"; done'
 
 # Tmux attach with auto-create - if no sessions exist, create one
@@ -169,7 +176,9 @@ tmux() {
   fi
 }
 
-eval "$(thefuck --alias)"
+# thefuck is Python-based and has no working package on recent Ubuntu (Python 3.12),
+# so this must be guarded or every new shell on those boxes starts with a traceback.
+command -v thefuck >/dev/null && eval "$(thefuck --alias)"
 
 # run 'l' to list files after cd
 chpwd() {
@@ -193,8 +202,12 @@ command -v fzf >/dev/null && source <(fzf --zsh)
 
 export PATH="$HOME/.local/bin:$PATH"
 
-# pnpm
-export PNPM_HOME="/Users/jeordin.callister/Library/pnpm"
+# pnpm — path differs by OS; the hardcoded /Users/... form is dead weight on Linux
+if [[ "$OSTYPE" == darwin* ]]; then
+  export PNPM_HOME="$HOME/Library/pnpm"
+else
+  export PNPM_HOME="$HOME/.local/share/pnpm"
+fi
 case ":$PATH:" in
   *":$PNPM_HOME:"*) ;;
   *) export PATH="$PNPM_HOME:$PATH" ;;

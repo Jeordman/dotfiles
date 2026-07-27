@@ -6,9 +6,9 @@ auto_switch = false
 [ui]
 show_agent_labels_on_pane_borders = true
 
-agent_panel_sort = "priority"
+agent_panel_sort = "spaces"
 [ui.toast]
-delivery = "herdr"
+delivery = "terminal"
 
 [keys]
 # tmux muscle-memory (see ~/dotfiles/tmux/.tmux.conf)
@@ -36,6 +36,7 @@ navigate_pane_down = "down"
 [[keys.command]]
 key = "prefix+a"
 type = "popup"
+description = "Agents"          # shown as the popup border label (was "popup")
 command = "/Users/jeordin.callister/dotfiles/bin/bin/herdr-agent-picker"
 width = "70%"
 height = "60%"

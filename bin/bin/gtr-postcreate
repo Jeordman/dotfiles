@@ -5,11 +5,19 @@ set -e
 # Extracts ECOM-<num> from the branch name (if present) and starts the
 # tmux/cmux dev session via dev-init, kicking Claude into auto-accept mode for
 # that ticket. No ticket in branch name -> plain dev-init.
+#
+# GTR_CLOUD=1 (set by `gtrc`) selects the cloud-mode workspace instead: no dev
+# server, dependencies pre-warmed, implementation dispatched to a cloud session.
+# An env var is the only channel available here — gtr's postCreate hook takes no
+# flags, but it does inherit the environment of the `git gtr new` invocation.
 
 TICKET=$(git branch --show-current 2>/dev/null | grep -oE "ECOM-[0-9]+" | head -1 || true)
 
+INIT=dev-init
+[ "${GTR_CLOUD:-}" = "1" ] && INIT=dev-cloud
+
 if [ -n "$TICKET" ]; then
-    exec dev-init -d . -t "$TICKET"
+    exec "$INIT" -d . -t "$TICKET"
 else
-    exec dev-init -d .
+    exec "$INIT" -d .
 fi

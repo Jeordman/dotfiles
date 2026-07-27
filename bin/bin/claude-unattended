@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# claude-unattended — launch Claude Code with the unattended policy.
+#
+# Wraps one incantation, verified 2026-07-25:
+#
+#   claude --setting-sources local --settings <profile>
+#
+# Why exactly that, since it looks arbitrary:
+#   * Omitting `project` is what skips the repo's 45 deny rules AND its
+#     PreToolUse hooks (pre-bash-git-deny.sh, and the one that denies every MCP
+#     tool under bypassPermissions). Skills, agents and commands under
+#     .claude/ still load — they are filesystem artifacts, not settings — so the
+#     repo's toolkit and the goal-verifier agent survive.
+#   * Omitting `user` is required, not cosmetic: permission arrays merge across
+#     scopes and a lower-scope deny beats a higher-scope allow, so the global
+#     deny on `git commit`/`git push` would survive the profile and refuse the
+#     loop. Tested both ways.
+#   * `managed` is not a valid source. Only user|project|local are.
+#   * That leaves `local` — the repo's .claude/settings.local.json — as the only
+#     near-empty base. It has an empty deny array and defines no hooks.
+#
+# Protection is not lost by skipping the repo's rules: unattended-git-guard.sh,
+# wired from the profile, replaces the blanket git deny with a targeted one that
+# resolves the real push destination and refuses protected branches, force
+# pushes and history rewrites (46/46 in test).
+
+set -uo pipefail
+
+PROFILE="$HOME/dotfiles/claude/.claude/settings.unattended.json"
+WORK_DIR="$(pwd)"
+LEDGER=""
+NO_LEDGER=false
+
+USAGE="claude-unattended [-d dir] [-p profile] [-l ledger] [-L] [prompt...]
+  -l <path>  verification record the Stop gate enforces
+             (default .claude/state/verification-<branch>.md)
+  -L         no ledger — disables the Stop gate's evidence check entirely"
+
+while getopts "d:p:l:Lh" opt; do
+  case $opt in
+    d) WORK_DIR="$OPTARG" ;;
+    p) PROFILE="$OPTARG" ;;
+    l) LEDGER="$OPTARG" ;;
+    L) NO_LEDGER=true ;;
+    h) echo "$USAGE"; exit 0 ;;
+    *) echo "$USAGE"; exit 2 ;;
+  esac
+done
+shift $((OPTIND - 1))
+
+[ -f "$PROFILE" ] || { echo "claude-unattended: profile not found: $PROFILE" >&2; exit 2; }
+cd "$WORK_DIR" || { echo "claude-unattended: cannot cd to $WORK_DIR" >&2; exit 2; }
+
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || {
+  echo "claude-unattended: not inside a git repository" >&2; exit 2; }
+
+# `--setting-sources local` resolves to this file. If it is absent the run would
+# start with no base at all, so fail loudly rather than behave differently than
+# it did in testing.
+if [ ! -f "$ROOT/.claude/settings.local.json" ]; then
+  cat >&2 <<EOF
+claude-unattended: $ROOT/.claude/settings.local.json does not exist.
+The verified launch uses --setting-sources local, which reads that file. Create
+it (even as {}) before running unattended here, so the policy matches what was
+tested.
+EOF
+  exit 2
+fi
+
+# A deny in the local file would merge into the run and could refuse the loop
+# exactly as the global one does. Warn rather than fail: it may be deliberate.
+if [ "$(jq -r '.permissions.deny // [] | length' "$ROOT/.claude/settings.local.json" 2>/dev/null || echo 0)" != "0" ]; then
+  echo "claude-unattended: warning — .claude/settings.local.json defines deny rules, which merge into this run and win over the profile's allows." >&2
+fi
+
+# Marker for the re-wired repo hooks. Gitignored (.gitignore:60), so it never
+# reaches a cloud session — cloud sessions key on CLAUDE_CODE_REMOTE_SESSION_ID
+# instead. Removed on exit, including on interrupt.
+#
+# The `ledger` field is LOAD-BEARING, not decorative: unattended-stop-gate.sh
+# reads it and silently no-ops if it is absent. Omitting it (as this script did
+# until 2026-07-26) disables the entire anti-false-pass check while leaving every
+# log line looking correct — the gate's own test suite passed because it authored
+# markers by hand. Default it here so the wiring cannot rot again.
+MARKER="$ROOT/.claude/state/unattended.json"
+mkdir -p "$ROOT/.claude/state" 2>/dev/null || true
+
+if [ "$NO_LEDGER" = false ] && [ -z "$LEDGER" ]; then
+  SAFE_BRANCH=$(git branch --show-current 2>/dev/null | tr '/' '-' | tr -cd '[:alnum:]._-')
+  LEDGER="$ROOT/.claude/state/verification-${SAFE_BRANCH:-detached}.md"
+fi
+
+if [ "$NO_LEDGER" = true ]; then
+  printf '{"mode":"unattended","startedAt":"%s","profile":"%s"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$PROFILE" > "$MARKER" 2>/dev/null || true
+  echo "claude-unattended: -L given — Stop gate evidence check is DISABLED for this run." >&2
+else
+  printf '{"mode":"unattended","startedAt":"%s","profile":"%s","ledger":"%s"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$PROFILE" "$LEDGER" > "$MARKER" 2>/dev/null || true
+  echo "claude-unattended: verification record -> $LEDGER"
+  echo "  The Stop gate will not let this session end until that file exists and"
+  echo "  records a preview URL for every PASS. See the preview-url-verification skill."
+fi
+cleanup() { rm -f "$MARKER" 2>/dev/null || true; }
+trap cleanup EXIT INT TERM
+
+exec claude --setting-sources local --settings "$PROFILE" "$@"
