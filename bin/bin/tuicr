@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# tuicr — wrapper that keeps the Pull Requests tab working in reftable repos.
+#
+# tuicr detects the GitHub remote with libgit2, which refuses to open any repo
+# whose config sets extensions.refstorage=reftable ("unsupported extension
+# name"). Detection returns no remotes and the PR tab reports "No GitHub remote
+# on this repo". The git CLI reads reftable fine, so ask it for origin and hand
+# the answer to tuicr via --repo-url, which bypasses detection entirely.
+#
+# Only reftable repos are touched; everything else runs unmodified.
+
+set -euo pipefail
+
+self=$(cd "$(dirname "$0")" && pwd -P)/$(basename "$0")
+real=""
+while IFS= read -r candidate; do
+  [[ $(cd "$(dirname "$candidate")" && pwd -P)/$(basename "$candidate") == "$self" ]] && continue
+  real=$candidate
+  break
+done < <(type -aP tuicr)
+
+if [[ -z $real ]]; then
+  echo "tuicr wrapper: no real tuicr found on PATH (looked past $self)" >&2
+  exit 127
+fi
+
+if [[ " $* " != *" --repo-url"* ]] &&
+  [[ $(git config --get extensions.refstorage 2>/dev/null) == reftable ]] &&
+  origin=$(git remote get-url origin 2>/dev/null) &&
+  [[ -n $origin ]]; then
+  exec "$real" --repo-url "$origin" "$@"
+fi
+
+exec "$real" "$@"

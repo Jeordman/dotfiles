@@ -63,7 +63,7 @@ log_info "Creating symlinks with GNU Stow..."
 # codex itself and carries machine-specific state (a /Applications/ChatGPT.app
 # MCP server with a 120s startup timeout, absolute CODEX_HOME, per-project trust
 # entries keyed by /Users paths). Its portable half, AGENTS.md, is linked below.
-STOW_PACKAGES=(bin btop claude git hunk nvim tmux yazi zsh)
+STOW_PACKAGES=(bin btop claude git hunk nvim tmux tuicr yazi zsh)
 if [[ "$OS_TYPE" == "macos" ]]; then
     STOW_PACKAGES+=(ghostty herdr codex lazygit)
 fi

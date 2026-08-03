@@ -1,0 +1,10 @@
+# The first entry is the default type for a new comment; Tab / S-Tab cycles.
+# Untyped stays available at the end of the cycle.
+comment_types = [
+  { id = "note", definition = "neutral remark, no action implied" },
+  { id = "issue", definition = "problem to fix before merge", color = "red" },
+  { id = "suggestion", definition = "possible improvement", color = "yellow" },
+  { id = "nit", definition = "small optional tweak", color = "#d19a66" },
+  { id = "question", definition = "ask for clarification", color = "cyan" },
+  { id = "praise", definition = "positive feedback", color = "green" },
+]
