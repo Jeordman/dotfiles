@@ -99,8 +99,8 @@
       "Bash(brew:*)",
       "Bash(rm -rf /:*)",
       "Bash(rm -rf ~:*)",
-      "Read(//Users/jeordin.callister/.ssh/**)",
-      "Read(//Users/jeordin.callister/.aws/**)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
       "Bash(cat *.env*)",
       "Bash(head *.env*)",
       "Bash(tail *.env*)"
@@ -142,7 +142,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash '/Users/jeordin.callister/.claude/hooks/unattended-git-guard.sh'",
+            "command": "bash ~/.claude/hooks/unattended-git-guard.sh",
             "timeout": 10
           }
         ]
@@ -153,7 +153,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash '/Users/jeordin.callister/.claude/hooks/unattended-stop-gate.sh'",
+            "command": "bash ~/.claude/hooks/unattended-stop-gate.sh",
             "timeout": 300
           }
         ]

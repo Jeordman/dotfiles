@@ -1,0 +1,23 @@
+#!/bin/sh
+# clipcopy — read stdin, put it on the system clipboard.
+#
+# Exists because tmux and lazygit both need a copy command and the right one
+# differs by platform: pbcopy (macOS), wl-copy (Wayland), xclip/xsel (X11).
+# Referenced as "$HOME/bin/clipcopy" so it works even when tmux's server was
+# started without ~/bin on PATH.
+
+if command -v pbcopy >/dev/null 2>&1; then
+    exec pbcopy
+elif [ -n "${WAYLAND_DISPLAY:-}" ] && command -v wl-copy >/dev/null 2>&1; then
+    exec wl-copy
+elif command -v xclip >/dev/null 2>&1; then
+    exec xclip -selection clipboard -in
+elif command -v xsel >/dev/null 2>&1; then
+    exec xsel --clipboard --input
+elif command -v wl-copy >/dev/null 2>&1; then
+    exec wl-copy
+else
+    echo "clipcopy: no clipboard tool found (install xclip, xsel, or wl-clipboard)" >&2
+    cat >/dev/null
+    exit 1
+fi

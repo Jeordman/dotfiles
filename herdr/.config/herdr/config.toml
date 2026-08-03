@@ -40,3 +40,16 @@ description = "Agents"          # shown as the popup border label (was "popup")
 command = "/Users/jeordin.callister/dotfiles/bin/bin/herdr-agent-picker"
 width = "70%"
 height = "60%"
+
+[session]
+# After a server restart (reboot, `herdr server stop`, `herdr update`), reattach
+# agent panes to the conversation they were in instead of dropping to a bare
+# shell. session.json already stores each pane's cwd + agent session id; this is
+# what makes it actually resume them. Set explicitly — do not rely on the default.
+resume_agents_on_restore = true
+
+[experimental]
+# Forward Kitty graphics to the outer terminal so image previews render inside
+# herdr panes (yazi, etc.). Outer terminal is Ghostty, which supports KGP.
+# Without this herdr eats the escapes and yazi falls back to chafa.
+kitty_graphics = true

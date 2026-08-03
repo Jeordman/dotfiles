@@ -8,7 +8,10 @@
 	provider = github
 [gtr "copy"]
 	include = **/.env*
+	# `**/` does not match zero path segments in gtr's matcher, so the nested and
+	# top-level forms both have to be listed or a repo-root .env.example gets copied.
 	exclude = **/.env.example
+	exclude = .env.example
 [gtr "hook"]
 	postCreate = gtr-postcreate
 	preRemove = gtr-preremove

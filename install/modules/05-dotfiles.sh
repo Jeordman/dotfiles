@@ -55,9 +55,17 @@ log_info "Creating symlinks with GNU Stow..."
 # hardcodes /Users paths — both are client-side tools. On a headless Linux box
 # (e.g. the home server) their configs are dead weight at best and quietly
 # misleading at worst, so they're excluded there.
-STOW_PACKAGES=(bin btop claude codex git hunk lazygit nvim tmux yazi zsh)
+#
+# lazygit ships its config under ~/Library/Application Support (the macOS path);
+# the Linux equivalent is linked separately below.
+#
+# codex is macOS-only for the same reason as herdr: config.toml is rewritten by
+# codex itself and carries machine-specific state (a /Applications/ChatGPT.app
+# MCP server with a 120s startup timeout, absolute CODEX_HOME, per-project trust
+# entries keyed by /Users paths). Its portable half, AGENTS.md, is linked below.
+STOW_PACKAGES=(bin btop claude git hunk nvim tmux yazi zsh)
 if [[ "$OS_TYPE" == "macos" ]]; then
-    STOW_PACKAGES+=(ghostty herdr)
+    STOW_PACKAGES+=(ghostty herdr codex lazygit)
 fi
 
 if [[ "$DRY_RUN" == "true" ]]; then
@@ -127,6 +135,43 @@ link_personal_claude_config() {
 }
 
 link_personal_claude_config
+
+# Linux equivalents for the two packages stow skips there.
+#
+# lazygit: the repo holds one copy of config.yml at the macOS location
+# (~/Library/Application Support/lazygit). Linux lazygit reads
+# ~/.config/lazygit/config.yml instead, so point that at the same file rather
+# than duplicating it — a second copy would silently drift.
+#
+# codex: config.toml is machine-specific and skipped, but ~/.codex/AGENTS.md is
+# the global instruction file and is fully portable.
+link_linux_only_configs() {
+    [[ "$OS_TYPE" == "macos" ]] && return 0
+
+    local lazygit_src="$DOTFILES_DIR/lazygit/Library/Application Support/lazygit/config.yml"
+    local codex_src="$DOTFILES_DIR/codex/.codex/AGENTS.md"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[DRY RUN] Would link ~/.config/lazygit/config.yml and ~/.codex/AGENTS.md"
+        return 0
+    fi
+
+    if [ -f "$lazygit_src" ]; then
+        mkdir -p "$HOME/.config/lazygit"
+        backup_if_exists "$HOME/.config/lazygit/config.yml"
+        ln -sfn "$lazygit_src" "$HOME/.config/lazygit/config.yml"
+        log_success "Linked lazygit config into ~/.config/lazygit (Linux path)"
+    fi
+
+    if [ -f "$codex_src" ]; then
+        mkdir -p "$HOME/.codex"
+        backup_if_exists "$HOME/.codex/AGENTS.md"
+        ln -sfn "$codex_src" "$HOME/.codex/AGENTS.md"
+        log_success "Linked ~/.codex/AGENTS.md (config.toml stays machine-local on Linux)"
+    fi
+}
+
+link_linux_only_configs
 
 # Create .p10k.zsh if it doesn't exist (Powerlevel10k config)
 if [ ! -f "$HOME/.p10k.zsh" ] && [ -d "$HOME/.oh-my-zsh/custom/themes/powerlevel10k" ]; then

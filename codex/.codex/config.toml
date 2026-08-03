@@ -96,8 +96,8 @@ source_type = "local"
 source = "/Users/jeordin.callister/.codex/.tmp/bundled-marketplaces/openai-bundled"
 
 [marketplaces.claude-plugins-official]
-last_updated = "2026-07-26T21:31:33Z"
-last_revision = "4acf1a2a30144b9c426bc27d2c341507a91c3b33"
+last_updated = "2026-07-28T16:45:57Z"
+last_revision = "df098247831a98731abfc96b4b1298292f03e9c6"
 source_type = "git"
 source = "https://github.com/anthropics/claude-plugins-official.git"
 

@@ -4,7 +4,8 @@ git:
   pull:
     mode: "rebase"
 os:
-  copyToClipboardCmd: 'printf "%s" "{{text}}" | pbcopy'
+  # ~/bin/clipcopy picks pbcopy / wl-copy / xclip by platform.
+  copyToClipboardCmd: 'printf "%s" "{{text}}" | "$HOME/bin/clipcopy"'
   editPreset: 'nvim'
 customCommands:
   - key: 'o'
