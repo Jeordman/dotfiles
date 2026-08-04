@@ -8,3 +8,9 @@ comment_types = [
   { id = "question", definition = "ask for clarification", color = "cyan" },
   { id = "praise", definition = "positive feedback", color = "green" },
 ]
+
+[forge]
+# Don't prepend `[ISSUE]` / `[PRAISE]` to comment bodies posted to GitHub.
+# The types are for the TUI (colored badges, Tab cycling) and for the
+# `Comment types:` legend in the LLM export — both unaffected by this.
+comment_type_prefix = false
