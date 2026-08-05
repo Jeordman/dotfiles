@@ -18,20 +18,9 @@ ensure_package "nvim" "neovim" "Neovim"
 # tree-sitter CLI (required by nvim-treesitter main branch to compile parsers)
 # Note: brew 'tree-sitter' is the C library only; the CLI comes from npm.
 # On a fresh box npm doesn't exist yet — nvm is installed in 03-terminal.sh,
-# which runs after this module.
-if ! command -v tree-sitter &> /dev/null; then
-    if command -v npm &> /dev/null; then
-        log_info "Installing tree-sitter CLI..."
-        npm install -g tree-sitter-cli
-        log_success "tree-sitter CLI installed"
-    else
-        log_warning "SKIPPED: tree-sitter CLI needs npm, which isn't installed yet"
-        log_info "Re-run this script after nvm, or: npm install -g tree-sitter-cli"
-        record_failed_package "tree-sitter CLI (needs npm)"
-    fi
-else
-    log_success "tree-sitter CLI already installed"
-fi
+# which runs AFTER this module. ensure_npm_global queues it in that case and
+# 03-terminal.sh installs it once Node is up, so one run of install.sh is enough.
+ensure_npm_global "tree-sitter" "tree-sitter-cli" "tree-sitter CLI"
 
 # Ripgrep (used by Telescope in neovim)
 ensure_package "rg" "ripgrep" "ripgrep"
@@ -134,18 +123,6 @@ else
 fi
 
 # Codex CLI (OpenAI) — npm-only, and npm may not exist yet (see tree-sitter above)
-if ! command -v codex &> /dev/null; then
-    if command -v npm &> /dev/null; then
-        log_info "Installing Codex CLI..."
-        npm install -g @openai/codex
-        log_success "Codex CLI installed"
-    else
-        log_warning "SKIPPED: Codex CLI needs npm, which isn't installed yet"
-        log_info "Re-run this script after nvm, or: npm install -g @openai/codex"
-        record_failed_package "Codex CLI (needs npm)"
-    fi
-else
-    log_success "Codex CLI already installed"
-fi
+ensure_npm_global "codex" "@openai/codex" "Codex CLI"
 
 log_success "Development tools installation complete"

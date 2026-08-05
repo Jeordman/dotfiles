@@ -66,7 +66,22 @@ plugins=(
   zsh-syntax-highlighting
 )
 
-source $ZSH/oh-my-zsh.sh
+# Guarded: if install.sh aborted before it could fetch oh-my-zsh (or you're on a
+# box with only the bare zsh binary), an unguarded source kills the shell here —
+# you get "no such file or directory" and NONE of the config below runs, so no
+# aliases, no functions, no keybindings. Degrade to a plain-but-working zsh
+# instead, and say what to run to fix it.
+if [[ -f "$ZSH/oh-my-zsh.sh" ]]; then
+  source "$ZSH/oh-my-zsh.sh"
+else
+  print -u2 "zsh: oh-my-zsh missing — run: bash ~/dotfiles/install/modules/03-terminal.sh"
+  autoload -Uz compinit && compinit -u
+  autoload -Uz vcs_info
+  precmd_functions+=(vcs_info)
+  zstyle ':vcs_info:git:*' formats ' (%b)'
+  setopt PROMPT_SUBST
+  PROMPT='%F{green}%n@%m%f:%F{blue}%~%f%F{yellow}${vcs_info_msg_0_}%f$ '
+fi
 
 # You may need to manually set your language environment
 # export LANG=en_US.UTF-8

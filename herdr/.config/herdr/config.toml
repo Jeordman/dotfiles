@@ -37,7 +37,10 @@ navigate_pane_down = "down"
 key = "prefix+a"
 type = "popup"
 description = "Agents"          # shown as the popup border label (was "popup")
-command = "/Users/jeordin.callister/dotfiles/bin/bin/herdr-agent-picker"
+# Resolved via PATH, not an absolute path: the bin package stows to ~/bin, which
+# .zshrc puts on PATH on every machine. A hardcoded /Users/... path made this
+# config macOS-only and was the reason herdr wasn't stowed on Linux at all.
+command = "herdr-agent-picker"
 width = "70%"
 height = "60%"
 

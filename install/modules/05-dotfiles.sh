@@ -12,6 +12,11 @@ fi
 
 log_step "Linking Dotfiles with GNU Stow"
 
+# Must be initialised before use: the installer runs under `set -u`, so the
+# check at the end of this file dies with "unbound variable" if stow succeeded
+# and nothing ever assigned it.
+STOW_FAILED=false
+
 cd "$DOTFILES_DIR" || {
     log_error "Could not change to dotfiles directory: $DOTFILES_DIR"
     exit 1
@@ -46,15 +51,61 @@ backup_if_exists "$HOME/.codex/AGENTS.md"
 backup_if_exists "$HOME/.config/ghostty"
 backup_if_exists "$HOME/.config/btop"
 backup_if_exists "$HOME/.config/herdr/config.toml"
+# Claude Code writes this itself on first launch (theme/tui prefs), so on any
+# machine where Claude ran before install.sh it collides with the stowed copy.
+backup_if_exists "$HOME/.claude/settings.json"
+
+# The list above is inherently incomplete — any tool that writes its own config
+# before install.sh runs creates a fresh collision. That matters more than it
+# sounds: stow is ALL-OR-NOTHING. A single conflicting file aborts every package
+# in the same invocation, so one stray ~/.claude/settings.json silently leaves
+# nvim, zsh, tmux and the rest unlinked. Ask stow what would collide, back those
+# targets up, and let the real run proceed.
+resolve_stow_conflicts() {
+    local -a packages=("$@")
+    local -a conflicts=()
+    local dry_output target
+
+    dry_output=$(stow -R -n -v "${packages[@]}" 2>&1) && return 0
+
+    # stow reports conflicts as:
+    #   * cannot stow <src> over existing target <target> since neither a link nor a directory
+    #   * existing target is neither a link nor a directory: <target>
+    #   * existing target is not owned by stow: <target>
+    while IFS= read -r target; do
+        [ -n "$target" ] && conflicts+=("$target")
+    done < <(printf '%s\n' "$dry_output" | sed -n \
+        -e 's/.*over existing target \(.*\) since .*/\1/p' \
+        -e 's/.*existing target is neither a link nor a directory: \(.*\)/\1/p' \
+        -e 's/.*existing target is not owned by stow: \(.*\)/\1/p')
+
+    if [ ${#conflicts[@]} -eq 0 ]; then
+        # Dry run failed for a reason we can't auto-resolve — surface it.
+        log_warning "stow reported a problem that could not be auto-resolved:"
+        printf '%s\n' "$dry_output" | sed 's/^/    /'
+        return 1
+    fi
+
+    log_warning "Found ${#conflicts[@]} conflicting target(s); backing them up"
+    for target in "${conflicts[@]}"; do
+        backup_if_exists "$HOME/$target"
+    done
+}
 
 # Stow all configurations
 # Using -R (restow) to handle existing symlinks gracefully
 log_info "Creating symlinks with GNU Stow..."
 
-# ghostty is a GUI terminal emulator and herdr is a macOS-only binary whose config
-# hardcodes /Users paths — both are client-side tools. On a headless Linux box
-# (e.g. the home server) their configs are dead weight at best and quietly
-# misleading at worst, so they're excluded there.
+# ghostty is a GUI terminal emulator, so its config is dead weight on a headless
+# Linux box — you run Ghostty on the client and SSH in. It stays macOS-only.
+#
+# herdr used to be excluded here too, on the grounds that it was a macOS-only
+# binary with /Users paths in its config. That stopped being true: herdr runs on
+# the Linux server, and the one hardcoded path (the prefix+a agent picker) is now
+# resolved via PATH instead. Excluding it meant the keybindings never linked —
+# and worse, backup_if_exists below still moved ~/.config/herdr/config.toml aside
+# on every run without linking a replacement, so herdr silently fell back to
+# defaults and lost the config each time.
 #
 # lazygit ships its config under ~/Library/Application Support (the macOS path);
 # the Linux equivalent is linked separately below.
@@ -63,13 +114,35 @@ log_info "Creating symlinks with GNU Stow..."
 # codex itself and carries machine-specific state (a /Applications/ChatGPT.app
 # MCP server with a 120s startup timeout, absolute CODEX_HOME, per-project trust
 # entries keyed by /Users paths). Its portable half, AGENTS.md, is linked below.
-STOW_PACKAGES=(bin btop claude git hunk nvim tmux tuicr yazi zsh)
+STOW_PACKAGES=(bin btop claude git herdr hunk nvim tmux tuicr yazi zsh)
 if [[ "$OS_TYPE" == "macos" ]]; then
-    STOW_PACKAGES+=(ghostty herdr codex lazygit)
+    STOW_PACKAGES+=(ghostty codex lazygit)
 fi
 
 if [[ "$DRY_RUN" == "true" ]]; then
     log_info "[DRY RUN] Would run: stow -R -v ${STOW_PACKAGES[*]}"
+
+    # Actually ask stow what would happen. A dry run that only prints the
+    # command it would have run is useless for the one question you want
+    # answered before touching a working machine: "will this move any of my
+    # files?" `stow -n` changes nothing, so this is safe to run here.
+    dry_targets=()
+    for dir in "${STOW_PACKAGES[@]}"; do
+        [ -d "$DOTFILES_DIR/$dir" ] && dry_targets+=("$dir")
+    done
+
+    if [ ${#dry_targets[@]} -gt 0 ]; then
+        if stow_preview=$(stow -R -n -v "${dry_targets[@]}" 2>&1); then
+            log_success "[DRY RUN] No conflicts — nothing would be backed up"
+        else
+            log_warning "[DRY RUN] stow reports conflicts; these would be backed up first:"
+            printf '%s\n' "$stow_preview" | sed -n \
+                -e 's/.*over existing target \(.*\) since .*/    ~\/\1/p' \
+                -e 's/.*existing target is neither a link nor a directory: \(.*\)/    ~\/\1/p' \
+                -e 's/.*existing target is not owned by stow: \(.*\)/    ~\/\1/p'
+            log_info "Each would be moved to <file>.backup.<timestamp> — nothing is deleted"
+        fi
+    fi
 else
     # Check which directories exist before stowing
     # Not `local` — this block runs at top level when the module is executed
@@ -89,14 +162,24 @@ else
         exit 1
     fi
 
+    # Clear anything that would make stow abort the whole batch.
+    # `|| true` is required: this runs under `set -euo pipefail`, and the
+    # function returns non-zero when it sees a stow problem it can't auto-fix.
+    # Without the guard that advisory failure would kill the entire install.
+    resolve_stow_conflicts "${stow_targets[@]}" || true
+
     # Run stow with restow flag (-R) for idempotency
     if stow -R -v "${stow_targets[@]}" 2>&1; then
         log_success "Dotfiles linked successfully"
         log_info "Linked: ${stow_targets[*]}"
     else
-        log_error "Failed to link dotfiles with stow"
+        # Don't exit — the steps below (personal Claude config, Linux-only
+        # links, Codex MCP registration) are independent of stow and were
+        # previously skipped entirely whenever one package conflicted.
+        log_error "Failed to link dotfiles with stow — NO packages were linked"
+        log_error "stow is all-or-nothing: fix the conflict above and re-run"
         log_info "You can try manually: cd $DOTFILES_DIR && stow -R ${stow_targets[*]}"
-        exit 1
+        STOW_FAILED=true
     fi
 fi
 
@@ -173,10 +256,24 @@ link_linux_only_configs() {
 
 link_linux_only_configs
 
-# Create .p10k.zsh if it doesn't exist (Powerlevel10k config)
-if [ ! -f "$HOME/.p10k.zsh" ] && [ -d "$HOME/.oh-my-zsh/custom/themes/powerlevel10k" ]; then
+# Powerlevel10k prompt config.
+#
+# ~/.p10k.zsh is generated by `p10k configure` and is pure configuration, so it
+# belongs in the repo — otherwise every new machine gets a default prompt and you
+# re-answer the wizard. If it's tracked (zsh/.p10k.zsh), stow links it like any
+# other file and there's nothing to do here.
+if [ -f "$DOTFILES_DIR/zsh/.p10k.zsh" ]; then
+    log_success "Powerlevel10k config linked from dotfiles"
+elif [ -f "$HOME/.p10k.zsh" ]; then
+    # Configured on this machine but never committed — it'll be lost on the next
+    # box. Tell the user how to carry it across.
+    log_warning "~/.p10k.zsh exists but isn't tracked in dotfiles"
+    log_info "Keep your prompt across machines with:"
+    log_info "  mv ~/.p10k.zsh $DOTFILES_DIR/zsh/.p10k.zsh && cd $DOTFILES_DIR && stow -R zsh"
+elif [ -d "$HOME/.oh-my-zsh/custom/themes/powerlevel10k" ]; then
     log_info "Powerlevel10k theme installed but no .p10k.zsh found"
-    log_info "Run 'p10k configure' after opening zsh to set up your prompt"
+    log_info "Run 'p10k configure' in zsh, then move the result into the repo:"
+    log_info "  mv ~/.p10k.zsh $DOTFILES_DIR/zsh/.p10k.zsh && cd $DOTFILES_DIR && stow -R zsh"
 fi
 
 # Register Codex as an MCP server for Claude Code (user scope, idempotent)
@@ -207,6 +304,11 @@ fi
 if command -v gh &> /dev/null && ! gh auth status &> /dev/null; then
     log_warning "GitHub CLI is not authenticated"
     log_info "Run: gh auth login"
+fi
+
+if [[ "$STOW_FAILED" == "true" ]]; then
+    log_error "Dotfiles setup finished WITH ERRORS — symlinks were not created"
+    exit 1
 fi
 
 log_success "Dotfiles setup complete"

@@ -153,13 +153,51 @@ link_debian_binary_alias() {
     log_success "Linked $expected -> $actual in ~/.local/bin"
 }
 
-# Install a GitHub release tarball for tools with no apt package (lazygit, yazi).
-# Expects the archive to contain the binary at the top level.
+# Extract a release archive, whichever format upstream chose. lazygit ships
+# .tar.gz, yazi ships .zip — supporting only tar meant yazi could never be
+# installed without a Rust toolchain.
+#
+# The zip branch degrades through three extractors so this works on a stock
+# Ubuntu box: unzip isn't installed by default, but python3 always is.
+extract_release_archive() {
+    local file=$1
+    local dest=$2
+
+    case "$file" in
+        *.tar.gz|*.tgz) tar -xzf "$file" -C "$dest" ;;
+        *.tar.xz)       tar -xJf "$file" -C "$dest" ;;
+        *.tar.bz2)      tar -xjf "$file" -C "$dest" ;;
+        *.zip)
+            if command -v unzip &> /dev/null; then
+                unzip -q "$file" -d "$dest"
+            elif command -v 7z &> /dev/null; then
+                7z x -y -o"$dest" "$file" > /dev/null
+            elif command -v python3 &> /dev/null; then
+                python3 -m zipfile -e "$file" "$dest"
+            else
+                log_warning "No extractor available for .zip (need unzip, 7z or python3)"
+                return 1
+            fi
+            ;;
+        *)
+            log_warning "Don't know how to extract: $file"
+            return 1
+            ;;
+    esac
+}
+
+# Install one or more binaries from a GitHub release, for tools with no apt
+# package (lazygit, yazi). Binaries land in ~/.local/bin, so no sudo is needed.
+#
+# Args: repo, binary, asset_pattern, [display_name], [extra binaries...]
+# Extra binaries are companions shipped in the same archive (yazi's `ya` CLI);
+# they're installed if present but never cause a failure.
 install_from_github_release() {
     local repo=$1
     local binary=$2
     local asset_pattern=$3
     local display_name=${4:-$binary}
+    local extra_binaries=("${@:5}")
 
     if command -v "$binary" &> /dev/null; then
         log_success "$display_name already installed"
@@ -171,9 +209,13 @@ install_from_github_release() {
         return 0
     fi
 
+    # -i (case-insensitive) matters: projects rename assets between releases
+    # without warning. lazygit shipped "..._Linux_x86_64.tar.gz" for years and
+    # switched to lowercase "..._linux_x86_64.tar.gz", which silently turned into
+    # "Could not find a release asset" on every install until this was relaxed.
     local url
     url=$(curl -fsSL "https://api.github.com/repos/$repo/releases/latest" \
-        | grep -o "\"browser_download_url\": *\"[^\"]*${asset_pattern}[^\"]*\"" \
+        | grep -oi "\"browser_download_url\": *\"[^\"]*${asset_pattern}[^\"]*\"" \
         | head -1 | cut -d'"' -f4) || true
 
     if [[ -z "$url" ]]; then
@@ -182,18 +224,60 @@ install_from_github_release() {
         return 0
     fi
 
-    local tmpdir
+    local tmpdir asset
     tmpdir=$(mktemp -d)
     mkdir -p "$HOME/.local/bin"
 
-    if curl -fsSL "$url" -o "$tmpdir/asset.tar.gz" \
-        && tar -xzf "$tmpdir/asset.tar.gz" -C "$tmpdir" \
-        && find "$tmpdir" -name "$binary" -type f -perm -u+x -exec install -m 755 {} "$HOME/.local/bin/$binary" \; ; then
+    # Keep the upstream filename verbatim — extract_release_archive dispatches on
+    # the extension, and a naive "${url##*.}" would turn "foo.tar.gz" into
+    # "asset.gz", which matches no case branch and fails to extract.
+    asset="$tmpdir/$(basename "$url")"
+
+    if ! curl -fsSL "$url" -o "$asset"; then
+        log_warning "Failed to download $display_name from $url"
+        record_failed_package "$display_name"
+        rm -rf "$tmpdir"
+        return 0
+    fi
+
+    if ! extract_release_archive "$asset" "$tmpdir"; then
+        log_warning "Failed to extract $display_name archive"
+        record_failed_package "$display_name"
+        rm -rf "$tmpdir"
+        return 0
+    fi
+
+    # `find -exec` returns 0 even when it matches nothing, so the old code
+    # reported success for an archive that didn't contain the binary. Locate it
+    # explicitly and verify the install landed.
+    local found name
+    found=$(find "$tmpdir" -name "$binary" -type f -perm -u+x 2>/dev/null | head -1)
+
+    if [[ -z "$found" ]]; then
+        log_warning "$display_name archive did not contain an executable named '$binary'"
+        record_failed_package "$display_name"
+        rm -rf "$tmpdir"
+        return 0
+    fi
+
+    if install -m 755 "$found" "$HOME/.local/bin/$binary" \
+        && [[ -x "$HOME/.local/bin/$binary" ]]; then
         log_success "$display_name installed to ~/.local/bin"
     else
-        log_warning "Failed to install $display_name from GitHub releases"
+        log_warning "Failed to install $display_name to ~/.local/bin"
         record_failed_package "$display_name"
+        rm -rf "$tmpdir"
+        return 0
     fi
+
+    # Companion binaries: best-effort, never fatal.
+    for name in ${extra_binaries+"${extra_binaries[@]}"}; do
+        found=$(find "$tmpdir" -name "$name" -type f -perm -u+x 2>/dev/null | head -1)
+        if [[ -n "$found" ]]; then
+            install -m 755 "$found" "$HOME/.local/bin/$name" \
+                && log_success "$name installed to ~/.local/bin"
+        fi
+    done
 
     rm -rf "$tmpdir"
 }
@@ -259,4 +343,73 @@ safe_curl_install() {
         rm -f "$temp_script"
         return 1
     fi
+}
+
+# npm-global CLIs
+#
+# ORDERING PROBLEM these solve: 02-development.sh runs before 03-terminal.sh,
+# but nvm (and therefore npm) is installed by 03. On a fresh box every
+# npm-backed tool was skipped with "needs npm, which isn't installed yet" and
+# only appeared after a SECOND full run of install.sh.
+#
+# ensure_npm_global defers instead of giving up: if npm is missing it queues the
+# package, and 03-terminal.sh calls flush_deferred_npm_globals once Node is
+# available. Modules are sourced (not subprocesses), so the queue survives
+# across them.
+NPM_DEFERRED=()
+
+ensure_npm_global() {
+    local binary=$1
+    local package=$2
+    local display_name=${3:-$package}
+
+    if command -v "$binary" &> /dev/null; then
+        log_success "$display_name already installed"
+        return 0
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[DRY RUN] Would run: npm install -g $package"
+        return 0
+    fi
+
+    if ! command -v npm &> /dev/null; then
+        log_info "Deferring $display_name until Node is installed"
+        NPM_DEFERRED+=("$binary|$package|$display_name")
+        return 0
+    fi
+
+    log_info "Installing $display_name..."
+    if npm install -g "$package"; then
+        log_success "$display_name installed"
+    else
+        log_warning "Failed to install $display_name"
+        record_failed_package "$display_name"
+    fi
+}
+
+# Retry everything ensure_npm_global queued. Safe to call when nothing is
+# queued, and safe to call more than once.
+flush_deferred_npm_globals() {
+    [ ${#NPM_DEFERRED[@]} -eq 0 ] && return 0
+
+    local entry binary package display_name
+    local -a pending=("${NPM_DEFERRED[@]}")
+    NPM_DEFERRED=()
+
+    if ! command -v npm &> /dev/null; then
+        log_warning "npm still unavailable — these need a manual install:"
+        for entry in "${pending[@]}"; do
+            IFS='|' read -r binary package display_name <<< "$entry"
+            log_info "    npm install -g $package"
+            record_failed_package "$display_name (needs npm)"
+        done
+        return 0
+    fi
+
+    log_info "Installing deferred npm packages now that Node is available..."
+    for entry in "${pending[@]}"; do
+        IFS='|' read -r binary package display_name <<< "$entry"
+        ensure_npm_global "$binary" "$package" "$display_name"
+    done
 }

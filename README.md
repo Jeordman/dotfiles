@@ -70,7 +70,23 @@ cd dotfiles
 ### Dotfiles Linking (05-dotfiles.sh)
 - Symlinks all configs using GNU Stow
 - Creates timestamped backups of existing configs
-- Supports: bin, claude, ghostty, nvim, tmux, yazi, zsh
+- Detects and clears conflicting files before stowing (stow is all-or-nothing:
+  one collision aborts every package, which silently leaves nvim/zsh/tmux unlinked)
+- Supports: bin, btop, claude, git, hunk, nvim, tmux, tuicr, yazi, zsh
+  (plus ghostty, herdr, codex, lazygit on macOS)
+
+### Shell configuration
+
+zsh is the only configured shell — `zsh/.zshrc`, with oh-my-zsh and
+powerlevel10k installed by `03-terminal.sh`. There is deliberately no bash
+config: keeping a second shell at parity means every alias and function has to
+be written in the common subset of both languages, which costs more than it
+saves on machines where `03-terminal.sh` does its job.
+
+`~/.zshrc` degrades gracefully when oh-my-zsh is missing (a half-finished
+install, or a box with only the bare zsh binary): it warns, falls back to a
+`vcs_info` prompt, and still loads every alias, function and keybinding. Without
+that guard the shell dies at the `source` and you get none of your config.
 
 ## Usage Examples
 
@@ -118,20 +134,66 @@ stow claude      # Link claude config
 stow bin         # Link bin scripts
 
 # Or link everything at once
-stow bin claude ghostty nvim tmux yazi zsh
+stow bin btop claude git hunk nvim tmux tuicr yazi zsh
+
+# NOTE: stow is all-or-nothing. If any target already exists as a real file
+# (Claude Code writes ~/.claude/settings.json on first launch, for example),
+# stow aborts the ENTIRE batch and links nothing. Check with:
+#   stow -n -v <packages>
+# install.sh handles this automatically by backing up conflicts first.
 ```
+
+## Fresh machine, one run
+
+On a new Ubuntu box the intended flow is: add your SSH key to GitHub, clone this
+repo, run `./install.sh --all`. A single run is meant to be enough — these used
+to require a second pass or manual work and no longer do:
+
+| Was broken | Fix |
+|---|---|
+| `tree-sitter` / `codex` skipped ("needs npm") | `02-development.sh` runs before nvm exists, so npm-backed installs are **queued** and flushed by `03-terminal.sh` once Node is up |
+| `yazi` needed a Rust toolchain | Installs the prebuilt release binary (plus `ya`) into `~/.local/bin` |
+| `poppler` "Unable to locate package" | apt wants `poppler-utils`; brew wants `poppler` |
+| `lazygit` "no release asset found" | Upstream lowercased its asset names; matching is now case-insensitive |
+| stow silently linked nothing | Conflicting targets are backed up before stowing |
+| oh-my-zsh overwrote `~/.zshrc` | Installer now runs with `--keep-zshrc` |
+
+Still genuinely manual, because they need secrets or a human:
+
+- `gh auth login`
+- `~/.gitconfig.local` (your name/email — deliberately untracked)
+- tmux plugins: `Ctrl-Space + I`
+- `p10k configure`, **then commit the result** so the prompt follows you:
+  ```bash
+  mv ~/.p10k.zsh ~/dotfiles/zsh/.p10k.zsh && cd ~/dotfiles && stow -R zsh
+  ```
 
 ## Post-Installation
 
 1. **Restart your terminal** or run:
    ```bash
-   source ~/.zshrc
+   exec zsh
    ```
+   Don't `source ~/.zshrc` from bash — zsh syntax isn't valid bash and it fails
+   with `bad substitution` and `autoload: command not found`.
 
 2. **Set zsh as default shell** (if not done automatically):
    ```bash
    chsh -s $(which zsh)
    ```
+   The installer attempts this, then retries with `sudo chsh`. Both can still
+   fail: `chsh` authenticates via PAM, so on an SSH-key-only account with no
+   usable password it returns `PAM: Authentication failure` even with the right
+   password. Check what actually took effect:
+   ```bash
+   getent passwd "$USER" | cut -d: -f7
+   ```
+   and if it isn't zsh:
+   ```bash
+   sudo chsh -s $(which zsh) "$USER"
+   ```
+   This matters — until it's set you log into bash, which this repo does not
+   configure at all.
 
 3. **Install tmux plugins**:
    - Open tmux

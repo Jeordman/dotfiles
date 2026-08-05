@@ -155,6 +155,31 @@ print_header() {
     echo ""
 }
 
+# The user's LOGIN shell, portably.
+#
+# Do NOT use $SHELL for this: it's inherited from whatever launched install.sh
+# and does not change when chsh succeeds, so it can't tell you whether the
+# switch worked.
+#
+# `getent` is glibc — it does not exist on macOS, where accounts live in
+# Directory Services and `dscl` is authoritative (/etc/passwd holds only system
+# accounts there). Falling back to $SHELL keeps callers safe on either OS.
+get_login_shell() {
+    local shell=""
+
+    if command -v getent &> /dev/null; then
+        shell=$(getent passwd "$USER" 2>/dev/null | cut -d: -f7)
+    elif command -v dscl &> /dev/null; then
+        shell=$(dscl . -read "/Users/$USER" UserShell 2>/dev/null | awk '{print $2}')
+    fi
+
+    if [[ -z "$shell" ]]; then
+        shell=$(awk -F: -v u="$USER" '$1 == u { print $7 }' /etc/passwd 2>/dev/null)
+    fi
+
+    echo "${shell:-$SHELL}"
+}
+
 # Completion message
 print_completion_message() {
     echo ""
@@ -162,10 +187,29 @@ print_completion_message() {
     echo "  Installation Complete!"
     echo "======================================"
     echo ""
+    local login_shell
+    login_shell=$(get_login_shell)
+
     echo "Next steps:"
-    echo "1. Restart your terminal or run: source ~/.zshrc"
-    if command -v zsh &> /dev/null && [[ "$SHELL" != "$(which zsh)" ]]; then
-        echo "2. Your default shell has been changed to zsh"
+    if [[ "$login_shell" == *zsh ]]; then
+        echo "1. Restart your terminal, or reload with: exec zsh"
+    else
+        # Don't suggest `source ~/.zshrc` here: from bash that fails loudly with
+        # "bad substitution" and "autoload: command not found", because zsh
+        # syntax isn't valid bash. `exec zsh` is what actually works.
+        echo "1. Start zsh with: exec zsh"
+        echo "   (your login shell is $login_shell, which this repo does not"
+        echo "    configure — zsh holds all the aliases and functions)"
+    fi
+
+    if command -v zsh &> /dev/null && [[ "$login_shell" != *zsh ]]; then
+        echo "2. Default shell is NOT zsh yet. chsh needs your password, so it"
+        echo "   fails in unattended installs and when the account is SSH-key"
+        echo "   only. Switch it with either of:"
+        echo "     chsh -s $(command -v zsh)"
+        echo "     sudo chsh -s $(command -v zsh) $USER   # if the above fails"
+    else
+        echo "2. Default shell is zsh"
     fi
     echo "3. Open tmux and press Ctrl-Space + I to install plugins"
     echo "4. Open neovim - plugins will auto-install on first run"

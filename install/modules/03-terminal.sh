@@ -12,6 +12,57 @@ fi
 
 log_step "Installing Terminal Enhancements"
 
+# Ghostty terminfo for REMOTE machines.
+#
+# Ghostty sets TERM=xterm-ghostty. That name travels over SSH, but the terminfo
+# entry does not — so on a server that doesn't know it, every terminfo-driven
+# command fails ("'xterm-ghostty': unknown terminal type") and zsh's line editor
+# can't do cursor control, which shows up as garbled, double-echoed input.
+#
+# ncurses ships a `ghostty` entry but not the `xterm-ghostty` alias Ghostty
+# actually sets, so aliasing one to the other is usually all that's needed.
+# Compiled into ~/.terminfo, which ncurses searches by default — no sudo.
+ensure_ghostty_terminfo() {
+    command -v infocmp &> /dev/null || return 0
+
+    if infocmp xterm-ghostty &> /dev/null; then
+        log_success "xterm-ghostty terminfo already available"
+        return 0
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[DRY RUN] Would compile xterm-ghostty terminfo into ~/.terminfo"
+        return 0
+    fi
+
+    if ! command -v tic &> /dev/null; then
+        log_warning "tic not found — cannot add xterm-ghostty terminfo"
+        return 0
+    fi
+
+    if ! infocmp ghostty &> /dev/null; then
+        # No base entry to alias. Copying from the Ghostty machine is the
+        # supported fix; don't guess at a hand-written entry.
+        log_warning "No 'ghostty' terminfo entry to alias from"
+        log_info "From your Ghostty machine, run:"
+        log_info "    infocmp -x xterm-ghostty | ssh $USER@$(hostname) -- tic -x -"
+        return 0
+    fi
+
+    local src
+    src=$(mktemp)
+    printf 'xterm-ghostty|Ghostty terminal emulator,\n\tuse=ghostty,\n' > "$src"
+
+    if tic -x -o "$HOME/.terminfo" "$src" 2>/dev/null && infocmp xterm-ghostty &> /dev/null; then
+        log_success "Added xterm-ghostty terminfo to ~/.terminfo"
+    else
+        log_warning "Failed to compile xterm-ghostty terminfo"
+    fi
+    rm -f "$src"
+}
+
+ensure_ghostty_terminfo
+
 # Zsh
 ensure_package "zsh" "zsh" "Zsh"
 
@@ -108,18 +159,41 @@ ensure_package "thefuck" "thefuck" "thefuck"
 # File manager and media tools
 log_info "Installing file manager tools..."
 
-# Yazi file manager — no apt package exists on any current Debian/Ubuntu
+# Yazi file manager — no apt package exists on any current Debian/Ubuntu.
+#
+# Upstream publishes prebuilt binaries, so requiring a full Rust toolchain was
+# never necessary: it meant `yazi` and the y() helper in .zshrc were dead on
+# every server that didn't happen to have cargo. Pull the release archive
+# instead, and keep cargo only as a fallback.
 if [[ "$PACKAGE_MANAGER" == "apt" ]]; then
     if command -v yazi &> /dev/null; then
         log_success "yazi already installed"
-    elif command -v cargo &> /dev/null; then
-        log_info "Installing yazi via cargo..."
-        cargo install --locked yazi-fm yazi-cli
-        log_success "yazi installed"
     else
-        log_warning "SKIPPED: yazi has no apt package; needs Rust/Cargo or a release binary"
-        log_info "See https://github.com/sxyazi/yazi/releases"
-        record_failed_package "yazi"
+        # Assets are named yazi-<arch>-unknown-linux-gnu.zip
+        yazi_arch=$(uname -m)
+        case "$yazi_arch" in
+            x86_64|amd64)  yazi_target="x86_64-unknown-linux-gnu" ;;
+            aarch64|arm64) yazi_target="aarch64-unknown-linux-gnu" ;;
+            *)             yazi_target="" ;;
+        esac
+
+        if [[ -n "$yazi_target" ]]; then
+            # `ya` is yazi's companion CLI (plugin/package management)
+            install_from_github_release "sxyazi/yazi" "yazi" \
+                "yazi-${yazi_target}.zip" "yazi" "ya"
+        fi
+
+        # Fall back to cargo only if the release install didn't produce a binary
+        if [[ ! -x "$HOME/.local/bin/yazi" ]] && ! command -v yazi &> /dev/null; then
+            if command -v cargo &> /dev/null; then
+                log_info "Installing yazi via cargo..."
+                cargo install --locked yazi-fm yazi-cli
+                log_success "yazi installed"
+            elif [[ -z "$yazi_target" ]]; then
+                log_warning "SKIPPED: no yazi release binary for architecture $yazi_arch"
+                record_failed_package "yazi"
+            fi
+        fi
     fi
 else
     ensure_package "yazi" "yazi" "yazi"
@@ -135,7 +209,13 @@ else
     ensure_package "7z" "p7zip-full" "7-Zip"
 fi
 
-ensure_package "pdftoppm" "poppler" "Poppler"
+# The formula is `poppler` on brew but `poppler-utils` on Debian/Ubuntu — asking
+# apt for "poppler" fails with "Unable to locate package" on every single run.
+if [[ "$PACKAGE_MANAGER" == "apt" ]]; then
+    ensure_package "pdftoppm" "poppler-utils" "Poppler"
+else
+    ensure_package "pdftoppm" "poppler" "Poppler"
+fi
 ensure_package "magick" "imagemagick" "ImageMagick"
 
 # resvg for SVG rendering (may need cargo on some systems)
@@ -204,11 +284,20 @@ else
     fi
 fi
 
+# Node exists now, so install anything 02-development.sh had to defer for want
+# of npm (tree-sitter CLI, Codex CLI). Without this they need a second full run.
+flush_deferred_npm_globals
+
 # Oh My Zsh
 log_info "Setting up Oh My Zsh..."
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
     log_info "Installing Oh My Zsh..."
-    safe_curl_install "https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh" "Oh My Zsh" "--unattended"
+    # --keep-zshrc is essential here: without it the oh-my-zsh installer replaces
+    # ~/.zshrc with its own template. That clobbers the stowed symlink, so every
+    # full install.sh run leaves another ~/.zshrc.backup.<timestamp> behind and
+    # briefly drops the real config. 05-dotfiles.sh re-links it afterwards, but
+    # only because it runs later — don't rely on that ordering.
+    safe_curl_install "https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh" "Oh My Zsh" "--unattended --keep-zshrc"
 else
     log_success "Oh My Zsh already installed"
 fi
@@ -255,15 +344,87 @@ else
 fi
 
 # Change default shell to zsh
-if command -v zsh &> /dev/null && [[ "$SHELL" != "$(which zsh)" ]]; then
-    log_info "Changing default shell to zsh..."
-    if chsh -s "$(which zsh)" 2>&1; then
-        log_success "Default shell changed to zsh"
+#
+# Compare against the LOGIN shell in passwd, not $SHELL: $SHELL is inherited from
+# whatever launched install.sh and doesn't change when chsh succeeds, so the old
+# check could report success while the login shell was still bash.
+#
+# chsh authenticates via PAM and prompts for a password. That fails outright on
+# SSH-key-only accounts with no usable password ("PAM: Authentication failure"),
+# which is the normal setup on a cloud server — so fall back to `sudo chsh`,
+# which changes another user's shell without needing that user's password.
+if command -v zsh &> /dev/null; then
+    zsh_path=$(command -v zsh)
+    current_login_shell=$(get_login_shell)
+
+    # Accept ANY zsh, not just the one first on PATH. On macOS `command -v zsh`
+    # finds Homebrew's /opt/homebrew/bin/zsh while the login shell is usually
+    # Apple's /bin/zsh; demanding an exact match would try to chsh (and prompt
+    # for a sudo password) on every single run for no real benefit.
+    if [[ "$current_login_shell" == "$zsh_path" || "$current_login_shell" == */zsh ]]; then
+        log_success "Default shell is already zsh ($current_login_shell)"
+    elif [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[DRY RUN] Would change default shell to $zsh_path"
     else
-        log_warning "Failed to change default shell - you may need to run: chsh -s \$(which zsh)"
+        # NEVER redirect stderr on the commands below.
+        #
+        # chsh and sudo write their "Password:" prompt to stderr. Sending that to
+        # /dev/null doesn't make them non-interactive — it hides the prompt while
+        # they sit there waiting for input, so the installer looks frozen at
+        # "Changing default shell to zsh..." with no indication it wants
+        # anything. Try the non-interactive routes FIRST, and when a prompt is
+        # genuinely needed, announce it and let it be seen.
+
+        # zsh must be listed in /etc/shells or chsh refuses it
+        if [ -f /etc/shells ] && ! grep -qx "$zsh_path" /etc/shells; then
+            if sudo -n true 2>/dev/null; then
+                echo "$zsh_path" | sudo -n tee -a /etc/shells > /dev/null \
+                    && log_success "Added $zsh_path to /etc/shells"
+            else
+                log_info "Adding $zsh_path to /etc/shells (sudo will ask for your password)"
+                echo "$zsh_path" | sudo tee -a /etc/shells > /dev/null \
+                    || log_warning "Could not add $zsh_path to /etc/shells"
+            fi
+        fi
+
+        log_info "Changing default shell to zsh..."
+
+        shell_changed=false
+
+        # 1. Passwordless sudo — silent and instant when available.
+        if sudo -n true 2>/dev/null && sudo -n chsh -s "$zsh_path" "$USER" 2>/dev/null; then
+            log_success "Default shell changed to zsh (passwordless sudo)"
+            shell_changed=true
+        else
+            # 2. Interactive. Warn BEFORE blocking, and leave stderr alone so the
+            #    password prompt is actually visible.
+            log_warning "This step needs a password — a prompt will appear below."
+            log_info "Press Ctrl-C to skip; you can always run it later with:"
+            log_info "    sudo chsh -s $zsh_path $USER"
+
+            if chsh -s "$zsh_path"; then
+                log_success "Default shell changed to zsh"
+                shell_changed=true
+            elif sudo chsh -s "$zsh_path" "$USER"; then
+                log_success "Default shell changed to zsh (via sudo)"
+                shell_changed=true
+            fi
+        fi
+
+        if [[ "$shell_changed" != "true" ]]; then
+            log_warning "Could not change the default shell automatically"
+            log_info "chsh needs a password this account may not have (SSH-key-only)."
+            log_info "Run this by hand:  sudo chsh -s $zsh_path $USER"
+        fi
+
+        # Report what actually took effect rather than assuming
+        current_login_shell=$(get_login_shell)
+        if [[ "$current_login_shell" == "$zsh_path" || "$current_login_shell" == */zsh ]]; then
+            log_info "Login shell is now $current_login_shell (takes effect next login)"
+        else
+            log_warning "Login shell is still $current_login_shell"
+        fi
     fi
-else
-    log_success "Default shell is already zsh"
 fi
 
 log_success "Terminal enhancements installation complete"

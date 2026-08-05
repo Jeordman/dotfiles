@@ -16,3 +16,6 @@
 	postCreate = gtr-postcreate
 	preRemove = gtr-preremove
 	postRemove = gtr-postremove
+[user]
+	email = callisterjeordin@gmail.com
+	name = Jeordin Callister
