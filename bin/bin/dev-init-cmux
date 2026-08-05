@@ -1,33 +1,24 @@
 #!/bin/bash
 set -euo pipefail
 
-# dev-init-cmux - Initialize a CMUX workflow with Claude, Neovim, and dev server
+# dev-init-cmux - Initialize a CMUX workflow with Claude and Neovim
 # Usage: dev-init-cmux [-d DIRECTORY] [-s] [-t TICKET] [-f]
 #   -d DIRECTORY     Working directory (default: current directory)
-#   -s               Force shell (skip dev server even if package.json exists)
+#   -s               Add a third plain shell tab (used by dev-cloud for the branch watcher)
 #   -t TICKET        Ticket ID to fetch from ClickUp and start Claude in auto-accept mode
 #   -f               Foreground: switch to the new workspace and close the launcher
 #                    terminal. Default is background — the workspace is built without
 #                    stealing focus, so you stay where you are (it appears in the sidebar).
 #
-# Creates a workspace with 3 tabs:
+# Creates a workspace with 2 tabs:
 #   Tab 1: Claude Code
 #   Tab 2: Neovim
-#   Tab 3: Dev server or shell
-
-pkg_manager() {
-  if [[ "$WORK_DIR" == */topout* ]]; then echo "npm"; \
-  elif command -v pnpm &>/dev/null; then echo "pnpm"; else echo "npm"; fi
-}
-
-# Returns "start" for Expo projects (no "dev" script), "dev" otherwise
-run_script() {
-  node -e "try{const p=require('$1/package.json');process.exit(p.scripts&&p.scripts.dev?0:1)}catch(e){process.exit(1)}" 2>/dev/null \
-    && echo "dev" || echo "start"
-}
+#
+# No dev server is ever started. Run `npm i` / `npm run dev` yourself in whatever
+# pane you want it in — auto-starting it caused more problems than it solved.
 
 WORK_DIR="$(pwd)"
-FORCE_SHELL=false
+SHELL_TAB=false
 TICKET=""
 FOREGROUND=false
 
@@ -35,7 +26,7 @@ FOREGROUND=false
 while getopts "d:st:f" opt; do
   case $opt in
     d) WORK_DIR="$OPTARG" ;;
-    s) FORCE_SHELL=true ;;
+    s) SHELL_TAB=true ;;
     t) TICKET="$OPTARG" ;;
     f) FOREGROUND=true ;;
     *) echo "Usage: $0 [-d DIRECTORY] [-s] [-t TICKET] [-f]"; exit 1 ;;
@@ -68,16 +59,6 @@ if ! command -v cmux &>/dev/null; then
   exit 1
 fi
 
-# Determine dev server command
-server_command=""
-if [ -f "$WORK_DIR/package.json" ] && [ "$FORCE_SHELL" = false ]; then
-  nvm_prefix=""
-  if [[ "$SESSION_NAME" == *"UFeelGreat"* ]] || [[ "$WORK_DIR" == *"UFeelGreat"* ]]; then
-    nvm_prefix="nvm use 16 && "
-  fi
-  server_command="${nvm_prefix}$(pkg_manager) i && $(pkg_manager) run $(run_script "$WORK_DIR")"
-fi
-
 # Helper: send a command to a surface in the new workspace
 send_cmd() {
   local surface="$1"
@@ -104,23 +85,24 @@ cmux reorder-workspace --workspace "$WS_ID" --index 999
 # Output format: "* surface:14  Terminal 3  [selected]"
 TAB1=$(cmux list-pane-surfaces --workspace "$WS_ID" | grep -oE 'surface:[0-9]+' | head -1)
 
-# Create 2 more tabs (order matters: new surfaces insert after the selected tab,
-# so we create them in reverse order to get: claude | neovim | dev)
+# Create the remaining tabs (order matters: new surfaces insert after the selected
+# tab, so we create them in reverse order to get: claude | neovim [| shell])
 # Output format: "OK surface:15 pane:9 workspace:6"
 # --focus false so building the tabs doesn't yank the screen to this workspace.
-TAB3=$(cmux new-surface --workspace "$WS_ID" $NEW_FOCUS_FLAG | grep -oE 'surface:[0-9]+')
+TAB3=""
+if [ "$SHELL_TAB" = true ]; then
+  TAB3=$(cmux new-surface --workspace "$WS_ID" $NEW_FOCUS_FLAG | grep -oE 'surface:[0-9]+')
+fi
 TAB2=$(cmux new-surface --workspace "$WS_ID" $NEW_FOCUS_FLAG | grep -oE 'surface:[0-9]+')
 
 # Rename tabs
 # NOTE: TAB1 (the claude tab) is intentionally left unnamed. cmux's
 # workspaceAutoNaming (automation.workspaceAutoNaming in cmux.json) auto-titles
 # agent tabs from the conversation at each turn-end, but a manual rename pins the
-# tab and permanently blocks auto-naming. neovim/dev/shell are non-agent tabs, so
+# tab and permanently blocks auto-naming. neovim/shell are non-agent tabs, so
 # auto-naming never touches them — keep their labels.
 cmux rename-tab --workspace "$WS_ID" --surface "$TAB2" "neovim"
-if [ -n "$server_command" ]; then
-  cmux rename-tab --workspace "$WS_ID" --surface "$TAB3" "dev"
-else
+if [ -n "$TAB3" ]; then
   cmux rename-tab --workspace "$WS_ID" --surface "$TAB3" "shell"
 fi
 
@@ -143,11 +125,7 @@ echo "Starting Neovim in tab 2..."
 send_cmd "$TAB2" "cd $WORK_DIR"
 send_cmd "$TAB2" "nvim ."
 
-if [ -n "$server_command" ]; then
-  echo "Starting dev server in tab 3..."
-  send_cmd "$TAB3" "cd $WORK_DIR"
-  send_cmd "$TAB3" "$server_command"
-else
+if [ -n "$TAB3" ]; then
   echo "Shell ready in tab 3."
   send_cmd "$TAB3" "cd $WORK_DIR"
 fi

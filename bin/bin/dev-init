@@ -1,17 +1,20 @@
 #!/bin/bash
 set -euo pipefail
 
-# dev-init - Initialize a workflow with Claude, Neovim, and dev server
+# dev-init - Initialize a workflow with Claude and Neovim
 # Auto-detects tmux vs CMUX vs herdr and dispatches accordingly.
 # Usage: dev-init [-d DIRECTORY] [-s] [-k] [-t TICKET] [-f]
 #   -d DIRECTORY     Working directory (default: current directory)
-#   -s               Force shell (skip dev server even if package.json exists)
+#   -s               Add a third plain shell window/tab (used by dev-cloud)
 #   -k               Keep current window (tmux only, ignored in CMUX/herdr)
 #   -t TICKET        Ticket ID to fetch from ClickUp and start Claude in auto-accept mode
 #   -f               Foreground the new workspace (cmux/herdr only; ignored in tmux).
 #                    Default in CMUX/herdr is background — build it without stealing focus.
 #
-# Session name is automatically derived from the directory name
+# Session name is automatically derived from the directory name.
+#
+# No dev server is ever started. Run `npm i` / `npm run dev` yourself in whatever
+# window you want it in — auto-starting it caused more problems than it solved.
 
 # Auto-detect the active multiplexer and delegate. Priority: CMUX first, then
 # herdr, else fall through to the tmux path below. The TMUX guard keeps a nested
@@ -25,20 +28,9 @@ if [ "${HERDR_ENV:-}" = "1" ] && [ -n "${HERDR_PANE_ID:-}" ] && [ -z "${TMUX:-}"
   exec dev-init-herdr "$@"
 fi
 
-pkg_manager() {
-  if [[ "$WORK_DIR" == */topout* ]]; then echo "npm"; \
-  elif command -v pnpm &>/dev/null; then echo "pnpm"; else echo "npm"; fi
-}
-
-# Returns "start" for Expo projects (no "dev" script), "dev" otherwise
-run_script() {
-  node -e "try{const p=require('$1/package.json');process.exit(p.scripts&&p.scripts.dev?0:1)}catch(e){process.exit(1)}" 2>/dev/null \
-    && echo "dev" || echo "start"
-}
-
 WORK_DIR="$(pwd)"
 IN_TMUX=false
-FORCE_SHELL=false
+SHELL_WINDOW=false
 KEEP_WINDOW=false
 TICKET=""
 
@@ -51,7 +43,7 @@ fi
 while getopts "d:skt:f" opt; do
   case $opt in
     d) WORK_DIR="$OPTARG" ;;
-    s) FORCE_SHELL=true ;;
+    s) SHELL_WINDOW=true ;;
     k) KEEP_WINDOW=true ;;
     t) TICKET="$OPTARG" ;;
     f) ;;  # cmux-only foreground flag; no-op in the tmux path (forwarded before parsing)
@@ -88,26 +80,14 @@ fi
 # Function to setup workflow windows
 setup_workflow() {
   local session=$1
-  local server_window_name="shell"
-  local server_command=""
-
-  # Check if directory name contains "UFeelGreat" and set nvm prefix
-  local nvm_prefix=""
-  if [[ "$SESSION_NAME" == *"UFeelGreat"* ]] || [[ "$WORK_DIR" == *"UFeelGreat"* ]]; then
-    nvm_prefix="nvm use 16 && "
-  fi
-
-  # Check if package.json exists and FORCE_SHELL is not set
-  if [ -f "$WORK_DIR/package.json" ] && [ "$FORCE_SHELL" = false ]; then
-    server_window_name="dev"
-    server_command="${nvm_prefix}$(pkg_manager) i && $(pkg_manager) run $(run_script "$WORK_DIR")"
-  fi
 
   # Create window 2 (Neovim)
   tmux new-window -t "$session" -n "neovim" -c "$WORK_DIR"
 
-  # Create window 3 (Dev server or shell)
-  tmux new-window -t "$session" -n "$server_window_name" -c "$WORK_DIR"
+  # Create window 3 (plain shell) only when asked for with -s
+  if [ "$SHELL_WINDOW" = true ]; then
+    tmux new-window -t "$session" -n "shell" -c "$WORK_DIR"
+  fi
 
   # Rename first window to claude (use 1 for 1-based indexing)
   tmux rename-window -t "$session:1" "claude"
@@ -129,10 +109,7 @@ setup_workflow() {
   echo "Starting Neovim in window 2..."
   tmux send-keys -t "$session:neovim" "nvim ." Enter
 
-  if [ -n "$server_command" ]; then
-    echo "Starting dev server in window 3..."
-    tmux send-keys -t "$session:$server_window_name" "$server_command" Enter
-  else
+  if [ "$SHELL_WINDOW" = true ]; then
     echo "Created shell terminal window 3..."
   fi
 }

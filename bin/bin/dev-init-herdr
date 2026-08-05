@@ -1,19 +1,21 @@
 #!/bin/bash
 set -euo pipefail
 
-# dev-init-herdr - Initialize a herdr workflow with Claude, Neovim, and dev server
+# dev-init-herdr - Initialize a herdr workflow with Claude and Neovim
 # Usage: dev-init-herdr [-d DIRECTORY] [-s] [-t TICKET] [-f]
 #   -d DIRECTORY     Working directory (default: current directory)
-#   -s               Force shell (skip dev server even if package.json exists)
+#   -s               Add a third plain shell tab (used by dev-cloud for the branch watcher)
 #   -t TICKET        Ticket ID to fetch from ClickUp and start Claude in auto-accept mode
 #   -f               Foreground: focus the new workspace and close the launcher pane.
 #                    Default is background — the workspace is built without stealing
 #                    focus, so you stay where you are (it shows up in the picker).
 #
-# Creates a workspace with 3 tabs:
+# Creates a workspace with 2 tabs:
 #   Tab 1: Claude Code
 #   Tab 2: Neovim
-#   Tab 3: Dev server or shell
+#
+# No dev server is ever started. Run `npm i` / `npm run dev` yourself in whatever
+# pane you want it in — auto-starting it caused more problems than it solved.
 #
 # This is the herdr sibling of dev-init-cmux. dev-init auto-dispatches here when
 # it detects a herdr session (HERDR_ENV=1). herdr's CLI mirrors cmux's primitives:
@@ -25,19 +27,8 @@ set -euo pipefail
 #   cmux close-surface      -> herdr pane close
 # herdr returns JSON-RPC (parse IDs with jq) instead of "workspace:N" strings.
 
-pkg_manager() {
-  if [[ "$WORK_DIR" == */topout* ]]; then echo "npm"; \
-  elif command -v pnpm &>/dev/null; then echo "pnpm"; else echo "npm"; fi
-}
-
-# Returns "start" for Expo projects (no "dev" script), "dev" otherwise
-run_script() {
-  node -e "try{const p=require('$1/package.json');process.exit(p.scripts&&p.scripts.dev?0:1)}catch(e){process.exit(1)}" 2>/dev/null \
-    && echo "dev" || echo "start"
-}
-
 WORK_DIR="$(pwd)"
-FORCE_SHELL=false
+SHELL_TAB=false
 TICKET=""
 FOREGROUND=false
 
@@ -45,7 +36,7 @@ FOREGROUND=false
 while getopts "d:st:fk" opt; do
   case $opt in
     d) WORK_DIR="$OPTARG" ;;
-    s) FORCE_SHELL=true ;;
+    s) SHELL_TAB=true ;;
     t) TICKET="$OPTARG" ;;
     f) FOREGROUND=true ;;
     k) ;;  # tmux-only; ignored here
@@ -89,16 +80,6 @@ if ! command -v jq &>/dev/null; then
   exit 1
 fi
 
-# Determine dev server command
-server_command=""
-if [ -f "$WORK_DIR/package.json" ] && [ "$FORCE_SHELL" = false ]; then
-  nvm_prefix=""
-  if [[ "$SESSION_NAME" == *"UFeelGreat"* ]] || [[ "$WORK_DIR" == *"UFeelGreat"* ]]; then
-    nvm_prefix="nvm use 16 && "
-  fi
-  server_command="${nvm_prefix}$(pkg_manager) i && $(pkg_manager) run $(run_script "$WORK_DIR")"
-fi
-
 # Build it in the background (--no-focus) unless the caller asked for -f.
 FOCUS_FLAG="--no-focus"
 [ "$FOREGROUND" = true ] && FOCUS_FLAG="--focus"
@@ -123,24 +104,24 @@ fi
 # conflict) — pane-cwd matching alone misses that case. Best-effort.
 mkdir -p "$WS_MAP_DIR" 2>/dev/null && printf '%s\n' "$WS_ID" > "$WS_MAP_FILE" 2>/dev/null || true
 
-# Create the neovim + dev/shell tabs (in order — herdr appends, so this gives
-# claude | neovim | dev). Always --no-focus so building tabs doesn't yank focus.
+# Create the neovim tab (and the optional shell tab) — herdr appends, so this
+# gives claude | neovim [| shell]. Always --no-focus so building tabs doesn't
+# yank focus.
 tab2_json=$(herdr tab create --workspace "$WS_ID" --cwd "$WORK_DIR" --label "neovim" --no-focus)
 TAB2_PANE=$(printf '%s' "$tab2_json" | jq -r '.result.root_pane.pane_id')
 
-if [ -n "$server_command" ]; then
-  tab3_json=$(herdr tab create --workspace "$WS_ID" --cwd "$WORK_DIR" --label "dev" --no-focus)
-else
+TAB3_PANE=""
+if [ "$SHELL_TAB" = true ]; then
   tab3_json=$(herdr tab create --workspace "$WS_ID" --cwd "$WORK_DIR" --label "shell" --no-focus)
+  TAB3_PANE=$(printf '%s' "$tab3_json" | jq -r '.result.root_pane.pane_id')
 fi
-TAB3_PANE=$(printf '%s' "$tab3_json" | jq -r '.result.root_pane.pane_id')
 
 # Deliberately DON'T name the Claude tab. herdr surfaces the live agent identity
 # itself — it renders terminal_title_stripped (the title Claude updates as it
 # works) in the agent panel, the `prefix a` picker, and (with
 # show_agent_labels_on_pane_borders) on pane borders. Pinning a manual label here
-# would just impose a static name over that. Only the non-agent tabs (neovim/dev)
-# get fixed labels, since herdr has nothing dynamic to show for them.
+# would just impose a static name over that. Only the non-agent tabs
+# (neovim/shell) get fixed labels, since herdr has nothing dynamic to show.
 
 # Build Claude command
 claude_cmd="claude"
@@ -160,10 +141,7 @@ herdr pane run "$TAB1_PANE" "$claude_cmd" >/dev/null
 echo "Starting Neovim in tab 2..."
 herdr pane run "$TAB2_PANE" "nvim ." >/dev/null
 
-if [ -n "$server_command" ]; then
-  echo "Starting dev server in tab 3..."
-  herdr pane run "$TAB3_PANE" "$server_command" >/dev/null
-else
+if [ -n "$TAB3_PANE" ]; then
   echo "Shell ready in tab 3."
 fi
 

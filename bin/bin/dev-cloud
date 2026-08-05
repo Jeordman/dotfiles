@@ -6,11 +6,10 @@
 # Differs from dev-init in exactly two ways, and delegates everything else to it
 # so there is one implementation of the herdr/cmux/tmux layout rather than two:
 #
-#   1. No dev server. You are not editing here while the cloud session works,
-#      and the feature gets verified against the deployed preview URL rather than
-#      localhost — so a local server would burn a port and CPU for nothing.
-#      (`dev-init -s` gives claude | nvim | shell; the shell pane is where the
-#      branch watcher goes once there is a SHA to watch.)
+#   1. An extra shell pane. `dev-init` gives claude | nvim; `dev-init -s` adds a
+#      third plain shell tab, which is where the branch watcher goes once there is
+#      a SHA to watch. (No launcher starts a dev server anymore — the feature gets
+#      verified against the deployed preview URL rather than localhost.)
 #
 #   2. Dependencies pre-warm in the background. The local fix phase needs tsc,
 #      lint and Playwright ready, and the cloud session is going to take minutes
@@ -67,7 +66,7 @@ dev-cloud: cloud-mode workspace for $(basename "$WORK_DIR")
 
 EOF
 
-# -s forces the shell pane instead of a dev server; everything else is dev-init's.
+# -s adds the extra shell pane for the watcher; everything else is dev-init's.
 if [ -n "$TICKET" ]; then
   exec dev-init -d "$WORK_DIR" -s -t "$TICKET"
 else
