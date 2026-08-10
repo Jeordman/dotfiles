@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# gtr.hook.preRemove — close any cmux/herdr workspaces rooted in the worktree
-# being removed, so dev servers / claude / nvim die cleanly before files
-# vanish under them.
+# gtr.hook.preRemove — make sure nothing is still living in the worktree being
+# removed, so dev servers / claude / nvim die cleanly before files vanish under
+# them. Closes any cmux/herdr workspaces rooted there, then kills whatever
+# processes are left holding the tree (detached background shells outlive every
+# workspace close).
 #
 # Handles whichever multiplexer(s) are installed — each cleanup is guarded and
 # best-effort. Always exits 0; never blocks `git gtr rm`.
@@ -53,7 +55,78 @@ herdr_cleanup() {
   "$helper" "$WORKTREE_PATH"
 }
 
+# --- processes: kill anything still rooted in the worktree ---------------
+# Closing a workspace only reaches processes owned by one of its panes. A dev
+# server launched by a detached background shell (e.g. a Claude Code
+# run_in_background bash) is reparented to PID 1 and survives every close, then
+# keeps rewriting .next while git deletes files — `git worktree remove` dies
+# with "Directory not empty" after already dropping the registration, leaving an
+# orphan directory that only `rm -rf` clears.
+#
+# Warn and kill; never abort the removal.
+proc_cleanup() {
+  command -v lsof >/dev/null 2>&1 || return 0
+
+  # Never kill ourselves or our ancestors — gtr may be run from inside the tree.
+  skip=" "
+  p=$$
+  while [ -n "$p" ] && [ "$p" -gt 1 ] 2>/dev/null; do
+    skip="$skip$p "
+    p=$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')
+  done
+
+  live() {
+    lsof -w -t +D "$WORKTREE_PATH" 2>/dev/null | sort -u \
+      | while read -r pid; do
+          case "$skip" in *" $pid "*) ;; *) printf '%s\n' "$pid" ;; esac
+        done
+  }
+
+  # Of a pid list, the ones still running.
+  alive() {
+    for pid in $1; do
+      kill -0 "$pid" 2>/dev/null && printf '%s\n' "$pid"
+    done
+  }
+
+  # Long-lived holders only. A build loop spawns short-lived children (mkdir,
+  # cp, esbuild) that lsof catches mid-syscall; they exit on their own and get a
+  # fresh pid every iteration, so they must drive neither the count nor the
+  # survivor warning — otherwise the hook always cries wolf.
+  pids=$(alive "$(live)")
+  [ -n "$pids" ] || return 0
+
+  # Resolve first, then report the count of what actually resolved — a stray
+  # transient that died between lsof and ps must not inflate the number.
+  detail=$(for pid in $pids; do
+    ps -o pid=,command= -p "$pid" 2>/dev/null | cut -c1-100 | sed 's/^/      /'
+  done)
+  [ -n "$detail" ] || return 0
+
+  printf '  → killing %s process(es) still rooted in the worktree\n' \
+    "$(printf '%s\n' "$detail" | wc -l | tr -d ' ')"
+  printf '%s\n' "$detail"
+
+  kill $pids 2>/dev/null
+  sleep 2
+
+  survivors=$(alive "$pids")
+  if [ -n "$survivors" ]; then
+    kill -9 $survivors 2>/dev/null
+    sleep 1
+    survivors=$(alive "$pids")
+  fi
+
+  if [ -n "$survivors" ]; then
+    printf '    warn: %s process(es) survived SIGKILL — removal may fail\n' \
+      "$(printf '%s\n' "$survivors" | wc -l | tr -d ' ')"
+  fi
+  return 0
+}
+
+# Order matters: give the multiplexers a clean shot before resorting to kill.
 cmux_cleanup
 herdr_cleanup
+proc_cleanup
 
 exit 0

@@ -18,5 +18,9 @@ background-blur-radius = 10
 font-size = 16
 font-family = "Hack Nerd Font"
 
-title = " " 
+title = " "
+
+# Tabs live in the titlebar instead of their own row below it.
+# Swap to `hidden` to drop the titlebar (and traffic lights) entirely.
+macos-titlebar-style = tabs
 
