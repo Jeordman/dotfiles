@@ -28,9 +28,6 @@
       "Bash(touch *)",
       "Bash(cp *)",
       "Bash(mv *)",
-      "Bash(node *)",
-      "Bash(npx *)",
-      "Bash(npm run *)",
       "Bash(npm test *)",
       "Bash(curl *localhost*)",
       "Bash(curl *127.0.0.1*)",
@@ -38,8 +35,6 @@
       "Bash(curl *[::1]*)",
       "Bash(wget *localhost*)",
       "Bash(wget *127.0.0.1*)",
-      "Bash(python *)",
-      "Bash(python3 *)",
       "Bash(git status)",
       "Bash(git status *)",
       "Bash(git show *)",
@@ -120,7 +115,6 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "opus[1m]",
   "enableAllProjectMcpServers": true,
   "hooks": {
     "SessionStart": [
@@ -166,5 +160,37 @@
   "remoteControlAtStartup": true,
   "agentPushNotifEnabled": true,
   "skipAutoPermissionPrompt": true,
+  "autoMode": {
+    "soft_deny": [
+      "$defaults",
+      "Bash(git push --force*) in /Users/jeordin.callister/unicity/new-shop targeting develop, master, or staging",
+      "Writes/deploys targeting k8s namespaces via -n flags in this project (configs, rail, schema, audiences, environments, kern) pending confirmation of environment sensitivity"
+    ],
+    "environment": [
+      "### Org-wide",
+      "**Organization**: Unicity",
+      "**Cloud provider(s)**: None configured",
+      "**Repository visibility**: Private — Unicity/new-shop (per gh: rulesets none listed, but protected branches present)",
+      "**Internal sharing / snippet hosting**: None configured — treat public paste/gist services as outside the trust boundary",
+      "**Secrets management**: None configured",
+      "**Default / protected branches**: Default `master`; protected: `develop`, `master`, `staging` (Unicity/new-shop, via gh)",
+      "**CI/CD deploy targets**: None configured",
+      "**Network posture**: None configured",
+      "**Source control**: Unicity/new-shop and its remotes (`origin` → github.com:Unicity/new-shop.git, `staging`) only — no additional orgs configured",
+      "**Trusted internal domains**: hydraqa.unicity.net, hydra.unicity.net, shop.unicity.com, shop2.unicity.com, unicity.link, new-shop-docs.vercel.app, shop2-stg.unicity.dev, solar.unicity.com",
+      "**Trusted cloud buckets**: None configured",
+      "**Key internal services**: hydraqa.unicity.net, hydra.unicity.net, shop.unicity.com, shop2.unicity.com, shop2-stg.unicity.dev, solar.unicity.com (Hydra = customers/orders/pricing, per CLAUDE.md)",
+      "**Internal package registry**: None configured",
+      "**Sensitive data locations & audiences**: `.env*` files (apps/design-previews/.env.example, apps/docs/.env.example, apps/enrollment/.env.example, apps/shop-api/.env.example, apps/shop-api/.env.local, apps/shop/.env.example, apps/shop/.env.local, packages/db/.env.example, packages/db/.env.local), CI secrets (DATABASE_URL_UNPOOLED, IT_INCIDENTS_RELEASES_WEBHOOK_URL, NEON_API_KEY, VERCEL_TOKEN); share only with audiences cleared at the [named+specifics] bar",
+      "**Data retention / declassification**: None configured",
+      "**Sensitive remote targets**: any namespace, host, or container whose name carries `prod` or `production` as a whole word or name segment; k8s namespaces seen in use (configs, rail, schema, audiences, environments, kern) are not prod-named and are not auto-treated as sensitive",
+      "**Protected deployment namespaces / environments**: None configured — fall back to the Sensitive remote targets heuristic",
+      "**Protected IaC scopes**: IAM, RBAC, networking, quota, and node-pool resources; anything whose name or tag carries `prod` or `production` as a whole word or name segment",
+      "### User-specific",
+      "**Primary use of Claude Code**: software development (Next.js/Turborepo monorepo — Hydra/Cosmic e-commerce platform)",
+      "**Trusted repo**: /Users/jeordin.callister/unicity/new-shop (Unicity/new-shop) and its remotes `origin` (github.com:Unicity/new-shop.git) and `staging`; private repo, so confidential material is fine to commit there but secrets/credentials are never cleared by visibility",
+      "**Org-specific CLIs**: herdr, probe, tuicr, hunk, gtr-clean (non-standard CLIs seen in shell history / project transcripts)"
+    ]
+  },
   "voiceEnabled": true
 }

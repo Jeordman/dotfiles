@@ -141,8 +141,7 @@ function y() {
 }
 
 alias v='nvim'
-# alias c='claude --name "${PWD:t}"'  # name remote session after the folder (no random suffix)
-alias c='claude'
+alias c='claude'  # naming is handled by the claude() wrapper further down
 alias h='herdr'
 alias cc='codex'
 alias cr='codex exec review --base main --uncommitted'
@@ -189,6 +188,40 @@ tmux() {
     # For all other tmux commands, pass through normally
     command tmux "$@"
   fi
+}
+
+# Name every Remote Control session after its git worktree.
+# All sessions run with remoteControlAtStartup, so each one appears in
+# claude.ai/code and the phone app. Left alone, that row gets titled from the
+# conversation (or `hostname-xxxx`), which is unusable when nine worktrees of the
+# same repo are connected at once. `--remote-control <name>` pins the row title
+# to the worktree AND marks it definitive, so Claude stops re-titling it from
+# messages later. CLAUDE_REMOTE_CONTROL_SESSION_NAME_PREFIX (set in chpwd below)
+# only seeds the *fallback* title, which is why setting it alone never stuck.
+claude() {
+  local arg passthrough=0
+
+  # Subcommands and non-interactive/other-transport modes get no name injected.
+  case "${1-}" in
+    agents|auth|auto-mode|doctor|gateway|import|install|mcp|plugin|plugins|project|setup-token|ultrareview|update|upgrade)
+      passthrough=1 ;;
+  esac
+  for arg in "$@"; do
+    case "$arg" in
+      -p|--print|-n|--name|--name=*|--remote-control|--remote-control=*|--cloud|--cloud=*|--bg|--background|-w|--worktree|--worktree=*|--tmux|--tmux=*)
+        passthrough=1 ;;
+    esac
+  done
+  if (( passthrough )); then
+    command claude "$@"
+    return
+  fi
+
+  # Worktree root, not $PWD — running claude from apps/shop should still say
+  # which worktree it is.
+  local name="${PWD:t}" root
+  root=$(command git rev-parse --show-toplevel 2>/dev/null) && name="${root:t}"
+  command claude --remote-control "$name" "$@"
 }
 
 # thefuck is Python-based and has no working package on recent Ubuntu (Python 3.12),

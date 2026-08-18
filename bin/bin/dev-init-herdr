@@ -124,13 +124,19 @@ fi
 # (neovim/shell) get fixed labels, since herdr has nothing dynamic to show.
 
 # Build Claude command
-claude_cmd="claude"
+# Name the Remote Control session after the worktree directory, so the
+# claude.ai/code and phone session lists say which worktree a session belongs to
+# instead of titling the row from the conversation. The zsh claude() wrapper does
+# the same for hand-typed launches; passing it here keeps it right even when the
+# pane shell isn't zsh.
+RC_NAME="$(basename "$WORK_DIR")"
+claude_cmd="claude --remote-control \"$RC_NAME\""
 if [ -n "$TICKET" ]; then
   prompt="Use the ClickUp MCP to search for task $TICKET. Read the task description and create an implementation plan."
   if [ -f "$WORK_DIR/.claude/skills/planning/SKILL.md" ]; then
     prompt="/planning $prompt"
   fi
-  claude_cmd="claude --permission-mode acceptEdits \"$prompt\""
+  claude_cmd="claude --remote-control \"$RC_NAME\" --permission-mode acceptEdits \"$prompt\""
 fi
 
 # Run the commands. `herdr pane run` writes the command + Enter in one call, and
