@@ -43,7 +43,6 @@ backup_if_exists() {
 log_info "Checking for existing configurations..."
 backup_if_exists "$HOME/.zshrc"
 backup_if_exists "$HOME/.zprofile"
-backup_if_exists "$HOME/.tmux.conf"
 backup_if_exists "$HOME/.gitconfig"
 backup_if_exists "$HOME/.config/nvim"
 backup_if_exists "$HOME/.codex/config.toml"
@@ -59,7 +58,7 @@ backup_if_exists "$HOME/.claude/settings.json"
 # before install.sh runs creates a fresh collision. That matters more than it
 # sounds: stow is ALL-OR-NOTHING. A single conflicting file aborts every package
 # in the same invocation, so one stray ~/.claude/settings.json silently leaves
-# nvim, zsh, tmux and the rest unlinked. Ask stow what would collide, back those
+# nvim, zsh and the rest unlinked. Ask stow what would collide, back those
 # targets up, and let the real run proceed.
 resolve_stow_conflicts() {
     local -a packages=("$@")
@@ -149,7 +148,7 @@ log_info "Creating symlinks with GNU Stow..."
 # codex itself and carries machine-specific state (a /Applications/ChatGPT.app
 # MCP server with a 120s startup timeout, absolute CODEX_HOME, per-project trust
 # entries keyed by /Users paths). Its portable half, AGENTS.md, is linked below.
-STOW_PACKAGES=(bin btop claude git herdr hunk nvim tmux tuicr yazi zsh)
+STOW_PACKAGES=(bin btop claude git herdr nvim tuicr yazi zsh)
 if [[ "$OS_TYPE" == "macos" ]]; then
     STOW_PACKAGES+=(ghostty codex lazygit)
 fi

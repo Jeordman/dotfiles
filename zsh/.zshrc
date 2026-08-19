@@ -157,39 +157,6 @@ else
 fi
 alias zhome='for dir in ~/*/; do zoxide add "$dir"; done'
 
-# Tmux attach with auto-create - if no sessions exist, create one
-tmux() {
-  # Check if the first argument is 'a' or 'attach' or 'attach-session'
-  if [[ "$1" == "a" || "$1" == "attach" || "$1" == "attach-session" ]]; then
-    # Check if there are any tmux sessions
-    if ! command tmux has-session 2>/dev/null; then
-      # No sessions exist, create a new default one
-      echo "No tmux sessions found. Creating new session..."
-      # Check if btop exists and create session accordingly
-      if command -v btop &> /dev/null; then
-        # Navigate to unicity (if it exists) and create session with btop in a window named pulse
-        if command -v zoxide &> /dev/null && zoxide query uni &> /dev/null; then
-          local uni_dir
-          uni_dir=$(zoxide query uni)
-          command tmux new-session -d -s "THE SPIRE" -n "pulse" -c "$uni_dir" "btop"
-        else
-          command tmux new-session -d -s "THE SPIRE" -n "pulse" -c ~ "btop"
-        fi
-      else
-        # Create session with default shell
-        command tmux new-session -d -s "THE SPIRE" -c ~
-      fi
-      command tmux attach-session -t "THE SPIRE"
-    else
-      # Session exists, proceed normally
-      command tmux "$@"
-    fi
-  else
-    # For all other tmux commands, pass through normally
-    command tmux "$@"
-  fi
-}
-
 # Name every Remote Control session after its git worktree.
 # All sessions run with remoteControlAtStartup, so each one appears in
 # claude.ai/code and the phone app. Left alone, that row gets titled from the
@@ -200,6 +167,11 @@ tmux() {
 # only seeds the *fallback* title, which is why setting it alone never stuck.
 claude() {
   local arg passthrough=0
+  # xhigh is the working default. It is pinned here rather than in settings.json
+  # because /effort rewrites that file's effortLevel mid-session, which silently
+  # changes every session started afterwards. A launch flag outranks the file, so
+  # the drift stops mattering. An explicit --effort still wins over this.
+  local -a effort=(--effort xhigh)
 
   # Subcommands and non-interactive/other-transport modes get no name injected.
   case "${1-}" in
@@ -208,8 +180,9 @@ claude() {
   esac
   for arg in "$@"; do
     case "$arg" in
-      -p|--print|-n|--name|--name=*|--remote-control|--remote-control=*|--cloud|--cloud=*|--bg|--background|-w|--worktree|--worktree=*|--tmux|--tmux=*)
+      -p|--print|-n|--name|--name=*|--remote-control|--remote-control=*|--cloud|--cloud=*|--bg|--background|-w|--worktree|--worktree=*)
         passthrough=1 ;;
+      --effort|--effort=*) effort=() ;;
     esac
   done
   if (( passthrough )); then
@@ -221,7 +194,7 @@ claude() {
   # which worktree it is.
   local name="${PWD:t}" root
   root=$(command git rev-parse --show-toplevel 2>/dev/null) && name="${root:t}"
-  command claude --remote-control "$name" "$@"
+  command claude --remote-control "$name" "${effort[@]}" "$@"
 }
 
 # thefuck is Python-based and has no working package on recent Ubuntu (Python 3.12),

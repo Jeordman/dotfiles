@@ -109,7 +109,7 @@ run_interactive_installation() {
         run_module "02-development.sh"
     fi
 
-    if ask_yes_no "Install terminal enhancements (zsh, tmux, modern CLI tools)?"; then
+    if ask_yes_no "Install terminal enhancements (zsh, modern CLI tools)?"; then
         run_module "03-terminal.sh"
     fi
 

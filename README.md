@@ -54,7 +54,6 @@ cd dotfiles
 
 ### Terminal Enhancements (03-terminal.sh)
 - **Zsh** with Oh My Zsh
-- **Tmux** with TPM (plugin manager)
 - **NVM** (Node Version Manager) + Node.js LTS
 - **Modern CLI tools**:
   - bat (better cat)
@@ -71,9 +70,9 @@ cd dotfiles
 - Symlinks all configs using GNU Stow
 - Creates timestamped backups of existing configs
 - Detects and clears conflicting files before stowing (stow is all-or-nothing:
-  one collision aborts every package, which silently leaves nvim/zsh/tmux unlinked)
-- Supports: bin, btop, claude, git, hunk, nvim, tmux, tuicr, yazi, zsh
-  (plus ghostty, herdr, codex, lazygit on macOS)
+  one collision aborts every package, which silently leaves nvim/zsh and the rest unlinked)
+- Supports: bin, btop, claude, git, herdr, nvim, tuicr, yazi, zsh
+  (plus ghostty, codex, lazygit on macOS)
 
 ### Shell configuration
 
@@ -126,7 +125,6 @@ brew install stow  # macOS
 # Link specific configs
 cd ~/dotfiles
 stow nvim        # Link neovim config
-stow tmux        # Link tmux config
 stow zsh         # Link zsh config
 stow ghostty     # Link ghostty config
 stow yazi        # Link yazi config
@@ -134,7 +132,7 @@ stow claude      # Link claude config
 stow bin         # Link bin scripts
 
 # Or link everything at once
-stow bin btop claude git hunk nvim tmux tuicr yazi zsh
+stow bin btop claude git herdr nvim tuicr yazi zsh
 
 # NOTE: stow is all-or-nothing. If any target already exists as a real file
 # (Claude Code writes ~/.claude/settings.json on first launch, for example),
@@ -162,7 +160,6 @@ Still genuinely manual, because they need secrets or a human:
 
 - `gh auth login`
 - `~/.gitconfig.local` (your name/email — deliberately untracked)
-- tmux plugins: `Ctrl-Space + I`
 - `p10k configure`, **then commit the result** so the prompt follows you:
   ```bash
   mv ~/.p10k.zsh ~/dotfiles/zsh/.p10k.zsh && cd ~/dotfiles && stow -R zsh
@@ -195,22 +192,18 @@ Still genuinely manual, because they need secrets or a human:
    This matters — until it's set you log into bash, which this repo does not
    configure at all.
 
-3. **Install tmux plugins**:
-   - Open tmux
-   - Press `Ctrl-Space + I` (capital I)
-
-4. **Verify neovim setup**:
+3. **Verify neovim setup**:
    ```bash
    nvim
    :checkhealth
    ```
 
-5. **Configure Powerlevel10k** (if first time):
+4. **Configure Powerlevel10k** (if first time):
    ```bash
    p10k configure
    ```
 
-6. **Set up Claude Code MCP** (if using Claude Code):
+5. **Set up Claude Code MCP** (if using Claude Code):
    - The installation script installs Playwright MCP globally
    - Configure it in Claude Code with:
      ```bash
@@ -226,48 +219,6 @@ Still genuinely manual, because they need secrets or a human:
 ## Claude Code Commands
 
 This dotfiles repo includes custom slash commands for Claude Code integration:
-
-### `/wtn` - Create feature branch with worktree and tmux session
-
-Initialize a new git worktree with a feature branch and tmux session for parallel development.
-
-**Usage:**
-```bash
-/wtn <project> <base-branch> <type> <ticket> <description>
-```
-
-**Example:**
-```bash
-/wtn ClimbSmarter main feat ECOM-1234 checkout-flow
-```
-
-**What it does:**
-1. Creates a feature branch: `feat/ECOM-1234-checkout-flow`
-2. Creates a git worktree as a sibling directory
-3. Copies `.env` and `.env.local` files
-4. Initializes a tmux session for the worktree
-5. Attaches you to the new tmux session
-
-### `/wtr` - Safely remove worktrees
-
-Remove one or more worktrees, but only if code is committed and pushed.
-
-**Usage:**
-```bash
-/wtr <name-or-all>
-```
-
-**Examples:**
-```bash
-/wtr all                                    # Remove all clean worktrees
-/wtr ClimbSmarter-feat-ECOM-1234-checkout  # Remove specific worktree
-```
-
-**Safety checks:**
-- Prevents deletion of worktrees with uncommitted changes
-- Prevents deletion of worktrees with unpushed commits
-- Kills associated tmux sessions automatically
-- Protects main repository from accidental deletion
 
 ### `/plan-feature` - Interactive feature planning and documentation
 
@@ -346,7 +297,7 @@ Claude: Added! Now here's the Files to Create section...
 To remove dotfile symlinks:
 ```bash
 cd ~/dotfiles
-stow -D bin claude ghostty nvim tmux yazi zsh
+stow -D bin claude ghostty nvim yazi zsh
 ```
 
 This removes the symlinks but keeps your dotfiles directory intact.

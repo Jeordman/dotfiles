@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 03-terminal.sh - Terminal and shell enhancement tools
-# Installs zsh, oh-my-zsh, tmux, and modern CLI replacements
+# Installs zsh, oh-my-zsh, and modern CLI replacements
 
 # Source libraries if not already loaded (allows standalone execution)
 if ! type log_info &> /dev/null; then
@@ -65,9 +65,6 @@ ensure_ghostty_terminfo
 
 # Zsh
 ensure_package "zsh" "zsh" "Zsh"
-
-# Tmux
-ensure_package "tmux" "tmux" "Tmux"
 
 # Ghostty terminal
 if [[ "$OS_TYPE" == "macos" ]]; then
@@ -331,16 +328,6 @@ if [ ! -d "$ZSH_CUSTOM/themes/powerlevel10k" ]; then
     log_success "Powerlevel10k installed"
 else
     log_success "Powerlevel10k already installed"
-fi
-
-# Tmux Plugin Manager (TPM)
-log_info "Setting up Tmux Plugin Manager..."
-if [ ! -d "$HOME/.tmux/plugins/tpm" ]; then
-    log_info "Installing TPM..."
-    git clone https://github.com/tmux-plugins/tpm "$HOME/.tmux/plugins/tpm"
-    log_success "TPM installed"
-else
-    log_success "TPM already installed"
 fi
 
 # Change default shell to zsh

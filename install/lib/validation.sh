@@ -77,7 +77,7 @@ verify_installation() {
     local verification_failed=false
 
     # Check core tools
-    local -a core_tools=("stow" "git" "nvim" "tmux" "zsh")
+    local -a core_tools=("stow" "git" "nvim" "zsh")
 
     for tool in "${core_tools[@]}"; do
         if command -v "$tool" &> /dev/null; then

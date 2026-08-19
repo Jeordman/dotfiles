@@ -1,10 +1,10 @@
 #!/bin/sh
 # clipcopy — read stdin, put it on the system clipboard.
 #
-# Exists because tmux and lazygit both need a copy command and the right one
+# Exists because lazygit needs a copy command and the right one
 # differs by platform: pbcopy (macOS), wl-copy (Wayland), xclip/xsel (X11).
-# Referenced as "$HOME/bin/clipcopy" so it works even when tmux's server was
-# started without ~/bin on PATH.
+# Referenced by absolute path as "$HOME/bin/clipcopy" so it works even when the
+# calling process was started without ~/bin on PATH.
 
 if command -v pbcopy >/dev/null 2>&1; then
     exec pbcopy

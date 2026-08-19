@@ -39,7 +39,7 @@ log_step() {
 #
 # Not every tool exists in every OS's repos (yazi and lazygit aren't in apt, for
 # example). With `set -euo pipefail` a single missing package used to abort the
-# whole run, so everything after it — oh-my-zsh, p10k, TPM, stow — silently
+# whole run, so everything after it — oh-my-zsh, p10k, stow — silently
 # never happened. Failures are collected here instead and reported at the end.
 FAILED_PACKAGES=()
 
@@ -211,18 +211,17 @@ print_completion_message() {
     else
         echo "2. Default shell is zsh"
     fi
-    echo "3. Open tmux and press Ctrl-Space + I to install plugins"
-    echo "4. Open neovim - plugins will auto-install on first run"
-    echo "5. Run :checkhealth in neovim to verify setup"
+    echo "3. Open neovim - plugins will auto-install on first run"
+    echo "4. Run :checkhealth in neovim to verify setup"
     echo ""
     echo "Configuration files are symlinked from:"
     echo "  $DOTFILES_DIR"
     echo ""
     echo "To uninstall, run:"
     if [[ "${OS_TYPE:-}" == "macos" ]]; then
-        echo "  cd $DOTFILES_DIR && stow -D nvim tmux zsh ghostty"
+        echo "  cd $DOTFILES_DIR && stow -D nvim zsh ghostty"
     else
-        echo "  cd $DOTFILES_DIR && stow -D nvim tmux zsh"
+        echo "  cd $DOTFILES_DIR && stow -D nvim zsh"
     fi
     echo ""
 }

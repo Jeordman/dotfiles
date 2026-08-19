@@ -2,151 +2,34 @@
 set -euo pipefail
 
 # dev-init - Initialize a workflow with Claude and Neovim
-# Auto-detects tmux vs CMUX vs herdr and dispatches accordingly.
-# Usage: dev-init [-d DIRECTORY] [-s] [-k] [-t TICKET] [-f]
+# Auto-detects CMUX vs herdr and dispatches accordingly.
+# Usage: dev-init [-d DIRECTORY] [-s] [-t TICKET] [-f]
 #   -d DIRECTORY     Working directory (default: current directory)
 #   -s               Add a third plain shell window/tab (used by dev-cloud)
-#   -k               Keep current window (tmux only, ignored in CMUX/herdr)
 #   -t TICKET        Ticket ID to fetch from ClickUp and start Claude in auto-accept mode
-#   -f               Foreground the new workspace (cmux/herdr only; ignored in tmux).
-#                    Default in CMUX/herdr is background — build it without stealing focus.
+#   -f               Foreground the new workspace. Default is background — build it
+#                    without stealing focus.
 #
 # Session name is automatically derived from the directory name.
 #
 # No dev server is ever started. Run `npm i` / `npm run dev` yourself in whatever
 # window you want it in — auto-starting it caused more problems than it solved.
+#
+# This used to carry a third implementation for tmux. tmux is gone from these
+# dotfiles, so dev-init is now purely a dispatcher: all the layout logic lives in
+# dev-init-cmux and dev-init-herdr.
 
-# Auto-detect the active multiplexer and delegate. Priority: CMUX first, then
-# herdr, else fall through to the tmux path below. The TMUX guard keeps a nested
-# tmux-inside-cmux/herdr session on the tmux path.
-if [ -n "${CMUX_WORKSPACE_ID:-}" ] && [ -z "${TMUX:-}" ]; then
+# Auto-detect the active multiplexer and delegate. CMUX first, then herdr.
+if [ -n "${CMUX_WORKSPACE_ID:-}" ]; then
   # Forward all flags to dev-init-cmux (-d, -s, -t, -f)
   exec dev-init-cmux "$@"
 fi
-if [ "${HERDR_ENV:-}" = "1" ] && [ -n "${HERDR_PANE_ID:-}" ] && [ -z "${TMUX:-}" ]; then
+if [ "${HERDR_ENV:-}" = "1" ] && [ -n "${HERDR_PANE_ID:-}" ]; then
   # Forward all flags to dev-init-herdr (-d, -s, -t, -f)
   exec dev-init-herdr "$@"
 fi
 
-WORK_DIR="$(pwd)"
-IN_TMUX=false
-SHELL_WINDOW=false
-KEEP_WINDOW=false
-TICKET=""
-
-# Check if we're in a tmux session
-if [ -n "${TMUX:-}" ]; then
-  IN_TMUX=true
-fi
-
-# Parse arguments
-while getopts "d:skt:f" opt; do
-  case $opt in
-    d) WORK_DIR="$OPTARG" ;;
-    s) SHELL_WINDOW=true ;;
-    k) KEEP_WINDOW=true ;;
-    t) TICKET="$OPTARG" ;;
-    f) ;;  # cmux-only foreground flag; no-op in the tmux path (forwarded before parsing)
-    *) echo "Usage: $0 [-d DIRECTORY] [-s] [-k] [-t TICKET] [-f]"; exit 1 ;;
-  esac
-done
-
-# Try to find the directory
-if [ ! -d "$WORK_DIR" ]; then
-  # If not found, try ~/unicity/ as fallback
-  FALLBACK_DIR="$HOME/unicity/$WORK_DIR"
-  if [ -d "$FALLBACK_DIR" ]; then
-    WORK_DIR="$FALLBACK_DIR"
-  else
-    echo "Error: Directory not found in current directory or ~/unicity/"
-    echo "Looked in: $WORK_DIR and $FALLBACK_DIR"
-    exit 1
-  fi
-fi
-
-# Convert to absolute path
-WORK_DIR="$(cd "$WORK_DIR" && pwd)"
-
-# Auto-derive session name from directory name
-SESSION_NAME="$(basename "$WORK_DIR")"
-
-# Check if session already exists (use exact match with =)
-if tmux has-session -t "=$SESSION_NAME" 2>/dev/null; then
-  echo "Error: Session '$SESSION_NAME' already exists"
-  echo "Use: tmux kill-session -t $SESSION_NAME"
-  exit 1
-fi
-
-# Function to setup workflow windows
-setup_workflow() {
-  local session=$1
-
-  # Create window 2 (Neovim)
-  tmux new-window -t "$session" -n "neovim" -c "$WORK_DIR"
-
-  # Create window 3 (plain shell) only when asked for with -s
-  if [ "$SHELL_WINDOW" = true ]; then
-    tmux new-window -t "$session" -n "shell" -c "$WORK_DIR"
-  fi
-
-  # Rename first window to claude (use 1 for 1-based indexing)
-  tmux rename-window -t "$session:1" "claude"
-
-  # Build Claude command
-  # Name the Remote Control session after the worktree directory, so the
-  # claude.ai/code and phone session lists say which worktree a session belongs to
-  # instead of titling the row from the conversation. The zsh claude() wrapper does
-  # the same for hand-typed launches; passing it here keeps it right even when the
-  # pane shell isn't zsh.
-  local rc_name="$(basename "$WORK_DIR")"
-  local claude_cmd="claude --remote-control \"$rc_name\""
-  if [ -n "$TICKET" ]; then
-    local prompt="Use the ClickUp MCP to search for task $TICKET. Read the task description and create an implementation plan."
-    if [ -f "$WORK_DIR/.claude/skills/planning/SKILL.md" ]; then
-      prompt="/planning $prompt"
-    fi
-    claude_cmd="claude --remote-control \"$rc_name\" --permission-mode acceptEdits \"$prompt\""
-  fi
-
-  # Send commands to each window
-  echo "Starting Claude in window 1..."
-  tmux send-keys -t "$session:claude" "$claude_cmd" Enter
-
-  echo "Starting Neovim in window 2..."
-  tmux send-keys -t "$session:neovim" "nvim ." Enter
-
-  if [ "$SHELL_WINDOW" = true ]; then
-    echo "Created shell terminal window 3..."
-  fi
-}
-
-# Always create a new session
-echo "Creating new session: $SESSION_NAME"
-tmux new-session -d -s "$SESSION_NAME" -c "$WORK_DIR"
-
-setup_workflow "$SESSION_NAME"
-
-# Attach or switch depending on tmux state
-if [ "$IN_TMUX" = false ]; then
-  echo "Attaching to session..."
-  tmux attach-session -t "$SESSION_NAME"
-else
-  echo "Switching to session: $SESSION_NAME"
-
-  # Only kill the old window if KEEP_WINDOW is false
-  if [ "$KEEP_WINDOW" = false ]; then
-    # Capture current session, window, and pane to kill after switch
-    CURRENT_SESSION="$(tmux display-message -p '#S')"
-    CURRENT_WINDOW="$(tmux display-message -p '#I')"
-    CURRENT_PANE="$(tmux display-message -p '#P')"
-
-    # Switch to new session
-    tmux switch-client -t "$SESSION_NAME"
-
-    # Kill the old pane we came from (kills window if it was the only pane)
-    tmux kill-pane -t "$CURRENT_SESSION:$CURRENT_WINDOW.$CURRENT_PANE"
-  else
-    # Just switch without killing
-    tmux switch-client -t "$SESSION_NAME"
-  fi
-fi
+echo "Error: dev-init needs a CMUX workspace or a herdr pane." >&2
+echo "Neither CMUX_WORKSPACE_ID nor HERDR_ENV/HERDR_PANE_ID is set." >&2
+echo "Start cmux or herdr first, then run dev-init from inside it." >&2
+exit 1

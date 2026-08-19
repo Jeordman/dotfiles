@@ -164,7 +164,7 @@
       }
     }
   },
-  "effortLevel": "xhigh",
+  "effortLevel": "low",
   "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
   "theme": "dark",
@@ -200,7 +200,7 @@
       "### User-specific",
       "**Primary use of Claude Code**: software development (Next.js/Turborepo monorepo — Hydra/Cosmic e-commerce platform)",
       "**Trusted repo**: /Users/jeordin.callister/unicity/new-shop (Unicity/new-shop) and its remotes `origin` (github.com:Unicity/new-shop.git) and `staging`; private repo, so confidential material is fine to commit there but secrets/credentials are never cleared by visibility",
-      "**Org-specific CLIs**: herdr, probe, tuicr, hunk, gtr-clean (non-standard CLIs seen in shell history / project transcripts)"
+      "**Org-specific CLIs**: herdr, probe, tuicr, gtr-clean (non-standard CLIs seen in shell history / project transcripts)"
     ]
   },
   "voiceEnabled": true

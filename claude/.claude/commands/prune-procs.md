@@ -75,7 +75,7 @@ Split the signals. **Hard** evidence makes something a candidate on its own. **S
 **Disqualify outright** — do not list these at all, at any confidence:
 - anything with an ESTABLISHED connection from outside its own process tree
 - anything burning real CPU in `top`'s second sample
-- anything whose ancestry reaches a live nvim, shell, cmux, Ghostty, tmux, claude, or codex
+- anything whose ancestry reaches a live nvim, shell, cmux, Ghostty, herdr, claude, or codex
 - your own ancestry: walk up from the shell you are running in and exclude every PID on that chain, or you will offer to kill the session having this conversation
 - GUI apps under `/Applications` (headless browsers under `~/Library/Caches/ms-playwright` are fair game — those are Playwright leftovers, not apps the user opened)
 

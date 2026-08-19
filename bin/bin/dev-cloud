@@ -4,7 +4,7 @@
 # Usage: dev-cloud [-d DIRECTORY] [-t TICKET]
 #
 # Differs from dev-init in exactly two ways, and delegates everything else to it
-# so there is one implementation of the herdr/cmux/tmux layout rather than two:
+# so there is one implementation of the herdr/cmux layout rather than two:
 #
 #   1. An extra shell pane. `dev-init` gives claude | nvim; `dev-init -s` adds a
 #      third plain shell tab, which is where the branch watcher goes once there is
@@ -18,7 +18,7 @@
 #
 # Why not a full herdr sibling of dev-init-herdr: that file already handles
 # workspace creation, tab ordering, the gtr-preremove workspace mapping and the
-# cmux/tmux/herdr dispatch. Reimplementing it here would duplicate ~200 lines
+# cmux/herdr dispatch. Reimplementing it here would duplicate ~200 lines
 # and drift.
 
 set -uo pipefail

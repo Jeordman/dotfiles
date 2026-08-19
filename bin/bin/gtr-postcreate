@@ -3,7 +3,7 @@ set -e
 
 # gtr.hook.postCreate runs this in each new worktree.
 # Extracts ECOM-<num> from the branch name (if present) and starts the
-# tmux/cmux dev session via dev-init, kicking Claude into auto-accept mode for
+# cmux/herdr dev session via dev-init, kicking Claude into auto-accept mode for
 # that ticket. No ticket in branch name -> plain dev-init.
 #
 # GTR_CLOUD=1 (set by `gtrc`) selects the cloud-mode workspace instead: no dev

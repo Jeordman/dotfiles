@@ -32,14 +32,13 @@ SHELL_TAB=false
 TICKET=""
 FOREGROUND=false
 
-# Parse arguments (accept -k as a no-op: it's a tmux-only flag dev-init may forward)
-while getopts "d:st:fk" opt; do
+# Parse arguments
+while getopts "d:st:f" opt; do
   case $opt in
     d) WORK_DIR="$OPTARG" ;;
     s) SHELL_TAB=true ;;
     t) TICKET="$OPTARG" ;;
     f) FOREGROUND=true ;;
-    k) ;;  # tmux-only; ignored here
     *) echo "Usage: $0 [-d DIRECTORY] [-s] [-t TICKET] [-f]"; exit 1 ;;
   esac
 done
@@ -130,13 +129,13 @@ fi
 # the same for hand-typed launches; passing it here keeps it right even when the
 # pane shell isn't zsh.
 RC_NAME="$(basename "$WORK_DIR")"
-claude_cmd="claude --remote-control \"$RC_NAME\""
+claude_cmd="claude --remote-control \"$RC_NAME\" --effort xhigh"
 if [ -n "$TICKET" ]; then
   prompt="Use the ClickUp MCP to search for task $TICKET. Read the task description and create an implementation plan."
   if [ -f "$WORK_DIR/.claude/skills/planning/SKILL.md" ]; then
     prompt="/planning $prompt"
   fi
-  claude_cmd="claude --remote-control \"$RC_NAME\" --permission-mode acceptEdits \"$prompt\""
+  claude_cmd="claude --remote-control \"$RC_NAME\" --effort xhigh --permission-mode acceptEdits \"$prompt\""
 fi
 
 # Run the commands. `herdr pane run` writes the command + Enter in one call, and

@@ -11,7 +11,8 @@ agent_panel_sort = "spaces"
 delivery = "terminal"
 
 [keys]
-# tmux muscle-memory (see ~/dotfiles/tmux/.tmux.conf)
+# Carried over from tmux muscle-memory; the tmux config itself is gone, the
+# annotations below just record where each binding came from.
 prefix = "ctrl+space"            # tmux: set -g prefix C-Space
 workspace_picker = "prefix+s"    # tmux: bind s choose-tree (workspace ≈ tmux session)
 goto = "prefix+w"                # tmux: bind w choose-tree (navigator: workspaces/tabs/panes)
