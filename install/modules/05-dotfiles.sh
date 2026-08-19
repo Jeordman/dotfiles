@@ -93,6 +93,41 @@ resolve_stow_conflicts() {
 }
 
 # Stow all configurations
+# Vendored upstream skills live in submodules under vendor/, symlinked into
+# claude/.claude/skills/. Stow never sees vendor/ (not a STOW_PACKAGE), but the
+# symlinks dangle until the submodules are checked out, so do it before stowing.
+# sparse-checkout keeps only the skill directories we actually symlink on disk
+# instead of each project's full source. What to keep differs per upstream: tuicr
+# publishes skills/ at its root, while cursor/plugins is a 40-skill monorepo we
+# want exactly two directories out of. So each submodule lists its own sparsePath
+# entries in .gitmodules (repeat the key to keep more than one) and the loop reads
+# them, rather than assuming one layout for everyone.
+if [ -f "$DOTFILES_DIR/.gitmodules" ]; then
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[DRY RUN] Would run: git submodule update --init --remote vendor/"
+    else
+        log_info "Syncing vendored skill submodules..."
+        if git -C "$DOTFILES_DIR" submodule update --init --remote >/dev/null 2>&1; then
+            # Collected as a space-separated string, not an array: this runs under
+            # `set -u` on bash 3.2 (stock macOS), where expanding an empty array
+            # is an error, and a nested process substitution inside this loop can
+            # deadlock. Sparse paths are git paths we author, so the unquoted
+            # word-splitting below is intentional and safe.
+            while IFS= read -r submodule; do
+                sparse_paths=$(git -C "$DOTFILES_DIR" config --file .gitmodules \
+                    --get-all "submodule.$submodule.sparsePath" 2>/dev/null | tr '\n' ' ')
+                [ -n "${sparse_paths// /}" ] || sparse_paths="skills"
+                git -C "$DOTFILES_DIR/$submodule" sparse-checkout init --cone >/dev/null 2>&1 || true
+                # shellcheck disable=SC2086
+                git -C "$DOTFILES_DIR/$submodule" sparse-checkout set $sparse_paths >/dev/null 2>&1 || true
+            done < <(git -C "$DOTFILES_DIR" config --file .gitmodules --get-regexp '^submodule\..*\.path$' | awk '{print $2}')
+            log_success "Vendored skill submodules synced"
+        else
+            log_warning "Could not sync vendored skill submodules; skill symlinks may dangle"
+        fi
+    fi
+fi
+
 # Using -R (restow) to handle existing symlinks gracefully
 log_info "Creating symlinks with GNU Stow..."
 

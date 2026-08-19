@@ -127,6 +127,17 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh ~/.claude/hooks/unslop-always-on.sh",
+            "timeout": 5,
+            "statusMessage": "Checking unslop always-on flag..."
+          }
+        ]
       }
     ]
   },
@@ -137,7 +148,7 @@
   "enabledPlugins": {
     "playwright@claude-plugins-official": true,
     "skill-creator@claude-plugins-official": true,
-    "i-have-adhd@i-have-adhd": true
+    "i-have-adhd@i-have-adhd": false
   },
   "extraKnownMarketplaces": {
     "anthropic-agent-skills": {

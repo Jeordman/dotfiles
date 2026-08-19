@@ -1,0 +1,11 @@
+[submodule "vendor/tuicr"]
+	path = vendor/tuicr
+	url = https://github.com/agavra/tuicr.git
+	branch = main
+	sparsePath = skills
+[submodule "vendor/cursor-plugins"]
+	path = vendor/cursor-plugins
+	url = https://github.com/cursor/plugins.git
+	branch = main
+	sparsePath = pstack/skills/bro
+	sparsePath = pstack/skills/unslop

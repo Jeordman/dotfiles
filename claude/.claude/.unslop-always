@@ -1,0 +1,10 @@
+Opt-in flag for unslop always-on mode.
+
+While this file exists, claude/.claude/hooks/unslop-always-on.sh injects the
+vendored unslop ruleset (claude/.claude/skills/unslop/SKILL.md, a symlink into
+the vendor/cursor-plugins submodule) into every session at start, so it applies
+before the first response instead of waiting to be triggered by a description
+match that never comes.
+
+Delete this file to turn always-on off. The skill stays available on demand
+either way.
