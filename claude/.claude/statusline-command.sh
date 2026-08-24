@@ -10,7 +10,6 @@ rate_5h=$(echo "$input" | jq -r '.rate_limits.five_hour.used_percentage // empty
 rate_resets=$(echo "$input" | jq -r '.rate_limits.five_hour.resets_at // empty')
 rate_7d=$(echo "$input" | jq -r '.rate_limits.seven_day.used_percentage // empty')
 rate_7d_resets=$(echo "$input" | jq -r '.rate_limits.seven_day.resets_at // empty')
-cwd=$(echo "$input" | jq -r '.workspace.current_dir // .cwd // empty')
 
 # Cache rate-limit data so other commands (e.g. /debate-plan pre-flight) can
 # read ground-truth usage %. Statusline renders often enough to stay fresh.
@@ -27,16 +26,7 @@ cwd=$(echo "$input" | jq -r '.workspace.current_dir // .cwd // empty')
     > "${cache_file}.tmp" 2>/dev/null && mv "${cache_file}.tmp" "${cache_file}" 2>/dev/null
 } || true
 
-effort=""
-for f in "${cwd}/.claude/settings.local.json" "${cwd}/.claude/settings.json" "${HOME}/.claude/settings.json"; do
-  if [ -n "$f" ] && [ -f "$f" ]; then
-    val=$(jq -r '.effortLevel // empty' "$f" 2>/dev/null)
-    if [ -n "$val" ]; then
-      effort="$val"
-      break
-    fi
-  fi
-done
+effort=$(echo "$input" | jq -r '.effort.level // empty')
 
 ESC=$'\033'
 DIM="${ESC}[2m"

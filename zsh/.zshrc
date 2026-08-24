@@ -167,11 +167,11 @@ alias zhome='for dir in ~/*/; do zoxide add "$dir"; done'
 # only seeds the *fallback* title, which is why setting it alone never stuck.
 claude() {
   local arg passthrough=0
-  # xhigh is the working default. It is pinned here rather than in settings.json
+  # high is the working default. It is pinned here rather than in settings.json
   # because /effort rewrites that file's effortLevel mid-session, which silently
   # changes every session started afterwards. A launch flag outranks the file, so
   # the drift stops mattering. An explicit --effort still wins over this.
-  local -a effort=(--effort xhigh)
+  local -a effort=(--effort high)
 
   # Subcommands and non-interactive/other-transport modes get no name injected.
   case "${1-}" in
