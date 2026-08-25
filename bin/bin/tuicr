@@ -24,11 +24,97 @@ if [[ -z $real ]]; then
   exit 127
 fi
 
+args=("$@")
 if [[ " $* " != *" --repo-url"* ]] &&
   [[ $(git config --get extensions.refstorage 2>/dev/null) == reftable ]] &&
   origin=$(git remote get-url origin 2>/dev/null) &&
   [[ -n $origin ]]; then
-  exec "$real" --repo-url "$origin" "$@"
+  args=(--repo-url "$origin" "$@")
 fi
 
-exec "$real" "$@"
+# Inside Herdr, label the tab for whatever is being reviewed, then restore it
+# when tuicr exits. Best effort: never let tab bookkeeping break the review.
+if [[ ${HERDR_ENV:-} == 1 && -n ${HERDR_TAB_ID:-} && ${1:-} != review ]] &&
+  command -v herdr &>/dev/null; then
+  rename_tab() { herdr tab rename "$HERDR_TAB_ID" "$1" >/dev/null 2>&1 || true; }
+
+  # Trim to at most $2 characters on a word boundary, adding an ellipsis when
+  # anything was dropped. Falls back to a hard cut if the first word is longer
+  # than the budget.
+  truncate_words() {
+    local text=$1 max=$2 out=""
+    [[ ${#text} -le max ]] && { printf '%s' "$text"; return; }
+    local word
+    for word in $text; do
+      local next=${out:+$out }$word
+      [[ ${#next} -gt $((max - 1)) ]] && break
+      out=$next
+    done
+    [[ -n $out ]] || out=${text:0:$((max - 1))}
+    printf '%s…' "$out"
+  }
+
+  prev_label=$(herdr tab get "$HERDR_TAB_ID" 2>/dev/null |
+    sed -n 's/.*"label":"\([^"]*\)".*/\1/p')
+  ref=$(git branch --show-current 2>/dev/null) || ref=""
+  [[ -n $ref ]] || ref=$(git rev-parse --short HEAD 2>/dev/null) || ref=""
+  [[ -n $ref ]] || ref=$(basename "$(pwd -P)")
+
+  rename_tab "Code Review $ref"
+
+  # Follow whatever tuicr is actually showing: opening a PR from the Pull
+  # Requests tab swaps the active session, so poll it and relabel. jq only,
+  # since the Herdr launch path already requires it.
+  watch_pid=""
+  if command -v jq &>/dev/null; then
+    (
+      shown="Code Review $ref"
+      while :; do
+        sleep 2
+        active=$("$real" review list --repo "$PWD" 2>/dev/null |
+          jq -er 'map(select(.active)) | first | .kind + "\t" + .slug + "\t" + .anchor' 2>/dev/null) ||
+          continue
+        IFS=$'\t' read -r kind slug anchor <<<"$active"
+
+        if [[ $kind == pr ]]; then
+          # slug is gh:<owner>/<repo>/pr/<number>
+          repo=${slug#*:} repo=${repo%/pr/*}
+          number=${slug##*/}
+          # A PR title reads better than #1234, but it needs a network call, so
+          # only pay for it when the session actually changed.
+          title=""
+          if [[ $slug != "${shown_slug:-}" ]] && command -v gh &>/dev/null; then
+            title=$(gh pr view "$number" --repo "$repo" --json title -q .title 2>/dev/null) || title=""
+          else
+            title=${shown_title:-}
+          fi
+          shown_slug=$slug shown_title=$title
+          if [[ -n $title ]]; then
+            label="Code Review $(truncate_words "$title" 20)"
+          else
+            label="Code Review #$number"
+          fi
+        else
+          label="Code Review $anchor"
+        fi
+
+        [[ -n $label && $label != "$shown" ]] || continue
+        shown=$label
+        rename_tab "$label"
+      done
+    ) &
+    watch_pid=$!
+  fi
+
+  cleanup_tab() {
+    [[ -n $watch_pid ]] && kill "$watch_pid" 2>/dev/null
+    [[ -n $prev_label ]] && rename_tab "$prev_label"
+    return 0
+  }
+  trap cleanup_tab EXIT
+
+  "$real" "${args[@]}"
+  exit $?
+fi
+
+exec "$real" "${args[@]}"

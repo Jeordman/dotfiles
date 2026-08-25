@@ -64,13 +64,12 @@ NODE_REPL_NODE_MODULE_DIRS = "/Applications/ChatGPT.app/Contents/Resources/cua_n
 NODE_REPL_NODE_PATH = "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node"
 NODE_REPL_TRUSTED_CODE_PATHS = "/Users/jeordin.callister/.codex"
 CODEX_HOME = "/Users/jeordin.callister/.codex"
-NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "2b020a2faded171bf620563ce51864b7c3ff320f1834f0044b73fcbeabb29a76,6d25aa7656feac858f3a3bdaea5bcbab0dbfd426c9de8e6931ce90c399ee8e4f"
-BROWSER_USE_AVAILABLE_BACKENDS = "chrome,iab"
-NODE_REPL_INSTRUCTIONS_USE_CASE_BROWSER = "Control the in-app browser in conjunction with the Browser Plugin."
+NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "0b03c76c1d0f3d4c81f89f58ff210ae6709fd1204d2c5a4fdffa0a7bdb961b96,6d25aa7656feac858f3a3bdaea5bcbab0dbfd426c9de8e6931ce90c399ee8e4f"
+BROWSER_USE_AVAILABLE_BACKENDS = "chrome"
 NODE_REPL_INSTRUCTIONS_USE_CASE_CHROME = "Control the Chrome browser in conjunction with the Chrome Plugin. Prefer this method of controlling Chrome over alternatives (such as Computer Use) unless the user explicitly mentions an alternative."
 NODE_REPL_INSTRUCTIONS_USE_CASE_COMPUTER_USE = "Control desktop apps on macOS through Computer Use."
 BROWSER_USE_CODEX_APP_BUILD_FLAVOR = "prod"
-BROWSER_USE_CODEX_APP_VERSION = "26.707.30751"
+BROWSER_USE_CODEX_APP_VERSION = "26.715.61943"
 CODEX_CLI_PATH = "/Applications/ChatGPT.app/Contents/Resources/codex"
 
 [mcp_servers.clickup]
@@ -91,13 +90,13 @@ cwd = "."
 enabled = false
 
 [marketplaces.openai-bundled]
-last_updated = "2026-07-21T14:55:45Z"
+last_updated = "2026-08-25T14:58:18Z"
 source_type = "local"
 source = "/Users/jeordin.callister/.codex/.tmp/bundled-marketplaces/openai-bundled"
 
 [marketplaces.claude-plugins-official]
-last_updated = "2026-08-18T16:53:20Z"
-last_revision = "c90c75e06d59787f12aa288f77e2a6b6e9349d1c"
+last_updated = "2026-08-25T14:58:18Z"
+last_revision = "b819188d2eea14e0400556ca29dbd1179a7c595b"
 source_type = "git"
 source = "https://github.com/anthropics/claude-plugins-official.git"
 
@@ -105,12 +104,6 @@ source = "https://github.com/anthropics/claude-plugins-official.git"
 last_updated = "2026-07-21T15:20:41Z"
 source_type = "local"
 source = "/Users/jeordin.callister/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
-
-[plugins."sites@openai-bundled"]
-enabled = true
-
-[plugins."browser@openai-bundled"]
-enabled = true
 
 [plugins."playwright@claude-plugins-official"]
 enabled = true
@@ -145,6 +138,9 @@ enabled = true
 [plugins."visualize@openai-bundled"]
 enabled = true
 
+[plugins."browser@openai-bundled"]
+enabled = true
+
 [features]
 hooks = true
 js_repl = false
@@ -156,3 +152,8 @@ trusted_hash = "sha256:8d29c14f64975ac6399d7dacbeec3a658ee4323d734b8ba4d8e44baff
 
 [hooks.state."/Users/jeordin.callister/.codex/hooks.json:session_start:0:0"]
 trusted_hash = "sha256:eb1f4f49f832327e0940aac8d45289046446d6ce60c7ee0d69781756ac47679d"
+
+[shell_environment_policy.set]
+BROWSER_USE_AVAILABLE_BACKENDS = "chrome"
+NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "0b03c76c1d0f3d4c81f89f58ff210ae6709fd1204d2c5a4fdffa0a7bdb961b96,6d25aa7656feac858f3a3bdaea5bcbab0dbfd426c9de8e6931ce90c399ee8e4f"
+NODE_REPL_TRUSTED_CODE_PATHS = "/Users/jeordin.callister/.codex"

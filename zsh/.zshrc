@@ -140,11 +140,70 @@ function y() {
 	rm -f -- "$tmp"
 }
 
+# tuicr against a base branch: `ts` for staging, `tm` for main/master, each
+# taking an optional branch to review (default: current HEAD).
+#
+# These exist because tuicr's PR tab dies on big PRs — GitHub pins base.sha at
+# PR creation and never moves it, so once the base branch drifts far enough the
+# three-dot diff crosses GitHub's 300-file cap and the diff endpoint answers
+# HTTP 406. Diffing locally against a freshly fetched base gives the honest file
+# count instead. Three dots, so the diff is merge-base scoped and doesn't show
+# commits the base picked up on its own.
+_tuicr_ref() {
+  local ref=$1 prefer=$2
+  if [[ $prefer == remote ]]; then
+    git show-ref --verify --quiet "refs/remotes/origin/$ref" && { print -r -- "origin/$ref"; return }
+    git show-ref --verify --quiet "refs/heads/$ref" && { print -r -- "$ref"; return }
+  else
+    git show-ref --verify --quiet "refs/heads/$ref" && { print -r -- "$ref"; return }
+    git show-ref --verify --quiet "refs/remotes/origin/$ref" && { print -r -- "origin/$ref"; return }
+  fi
+  git rev-parse --verify --quiet "$ref^{commit}" >/dev/null && { print -r -- "$ref"; return }
+  return 1
+}
+
+_tuicr_against() {
+  local base=$1; shift
+  git rev-parse --git-dir >/dev/null 2>&1 || { print -ru2 -- "tuicr: not a git repository"; return 1 }
+
+  local head=HEAD
+  if [[ -n ${1-} && ${1-} != -* ]]; then head=$1; shift; fi
+
+  # The base must be current or the merge base is a lie — that stale base is the
+  # whole failure mode this works around.
+  git fetch -q origin "+refs/heads/$base:refs/remotes/origin/$base" 2>/dev/null
+  [[ $head != HEAD ]] && git fetch -q origin "+refs/heads/$head:refs/remotes/origin/$head" 2>/dev/null
+
+  local baseref headref=HEAD
+  baseref=$(_tuicr_ref "$base" remote) || { print -ru2 -- "tuicr: no branch '$base'"; return 1 }
+  if [[ $head != HEAD ]]; then
+    headref=$(_tuicr_ref "$head" local) || { print -ru2 -- "tuicr: no branch '$head'"; return 1 }
+  fi
+
+  tuicr -r "$baseref...$headref" "$@"
+}
+
+ts() { _tuicr_against staging "$@" }
+
+tm() {
+  local trunk
+  for trunk in main master; do
+    if git show-ref --verify --quiet "refs/remotes/origin/$trunk" ||
+       git show-ref --verify --quiet "refs/heads/$trunk"; then
+      _tuicr_against "$trunk" "$@"
+      return
+    fi
+  done
+  print -ru2 -- "tuicr: no main or master branch here"
+  return 1
+}
+
 alias v='nvim'
 alias c='claude'  # naming is handled by the claude() wrapper further down
 alias h='herdr'
 alias cc='codex'
 alias cr='codex exec review --base main --uncommitted'
+alias t='tuicr'
 alias multipull="find . -mindepth 1 -maxdepth 1 -type d ! -name '.*' -print -exec git -C {} pull \;"
 # alias multimain='find . -mindepth 1 -maxdepth 1 -type d -print -exec sh -c '\''cd "$1" && (git checkout main 2>/dev/null || git checkout master)'\'' _ {} \;'
 # alias multi='multimain && multipull'
