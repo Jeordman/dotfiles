@@ -100,9 +100,7 @@
       "Bash(terraform *)",
       "Bash(cargo *)",
       "Bash(go *)",
-      "Bash(rustc *)",
-      "Bash(git commit *)",
-      "Bash(git push *)"
+      "Bash(rustc *)"
     ],
     "ask": [
       "Bash(env)",
