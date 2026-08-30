@@ -1,3 +1,7 @@
+# Neutral palette shared with ghostty/, herdr/, and nvim/.
+# Defined in themes/conductor.toml alongside this file.
+theme = "conductor"
+
 # The first entry is the default type for a new comment; Tab / S-Tab cycles.
 # Untyped stays available at the end of the cycle.
 comment_types = [
