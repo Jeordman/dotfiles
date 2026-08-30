@@ -8,7 +8,7 @@ return { -- Highlight, edit, and navigate code
       'bash', 'c', 'diff', 'html', 'lua', 'luadoc',
       'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc',
       'typescript', 'tsx', 'javascript', 'jsdoc',
-      'json', 'css', 'scss', 'php', 'phpdoc', 'sql', 'toml',
+      'json', 'css', 'scss', 'sql', 'toml',
     }
     require('nvim-treesitter').install(parsers)
 

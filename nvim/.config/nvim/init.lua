@@ -18,9 +18,6 @@ require('lazy').setup({
   require 'plugins.lspconfig',
   require 'plugins.conform',
   require 'plugins.blink',
-  -- require 'plugins.colorschemes.tokyonight',
-  -- require 'plugins.colorschemes.rose-pine',
-  -- require 'plugins.colorschemes.kanagawa',
   require 'plugins.colorschemes.catppuccin',
   require 'plugins.misc.todo-comments',
   require 'plugins.mini',
@@ -31,7 +28,6 @@ require('lazy').setup({
   require 'plugins.misc.indent-line',
   require 'plugins.git.fugitive',
   require 'plugins.lib.harpoon',
-  -- require 'plugins.lib.copilot',
   require 'plugins.lib.supermaven',
   require 'plugins.lib.undotree',
   require 'plugins.lib.marks',
@@ -40,7 +36,6 @@ require('lazy').setup({
   require 'plugins.misc.neoscroll',
   require 'plugins.misc.flash',
   require 'plugins.misc.render-markdown',
-  require 'plugins.misc.minimap',
   require 'plugins.git.diffview',
 }, {
   ui = {
