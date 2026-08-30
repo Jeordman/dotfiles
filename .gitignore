@@ -1,3 +1,10 @@
 # Python bytecode (regenerated automatically; e.g. from the nvim-review skill scripts)
 __pycache__/
 *.pyc
+
+# Superset-managed Claude plugin. The desktop app provisions and overwrites this
+# on every launch/update (each skill carries a .superset-managed sentinel), so
+# tracking it only produces conflicts. Disable individual skills through the
+# desktop's skill toggles or ~/.superset/disabled-skills.json, never by editing
+# files here.
+claude/.claude/skills/superset/

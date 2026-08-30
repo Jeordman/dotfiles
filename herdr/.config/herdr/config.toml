@@ -7,17 +7,23 @@ auto_switch = false
 # Conductor-style: neutral near-black surfaces, tiny value gaps between them,
 # no colored accent in the chrome. Base theme stays kanagawa so the chromatic
 # tokens it supplies (status dots, git status) keep their meaning.
-panel_bg      = "#0F0F0F"
-sidebar_bg    = "#0D0D0D"
-surface_dim   = "#111111"
-surface0      = "#161616"
-surface1      = "#1F1F1F"
-active_row_bg = "#212121"
-selection_bg  = "#2A2A2A"
+# Elevation runs outer-light to inner-dark: the terminal is the darkest surface
+# and the chrome around it lifts.
+# sidebar #161616 (outermost) -> pane frame #101010 -> terminal content #0C0C0C
+# (that last one is Ghostty's `background`, not a herdr token).
+sidebar_bg    = "#161616"
+panel_bg      = "#101010"
+surface_dim   = "#141414"
+surface0      = "#1C1C1C"
+surface1      = "#262626"
+active_row_bg = "#242424"
+selection_bg  = "#2E2E2E"
 overlay0      = "#5A5A5A"
 overlay1      = "#767676"
 subtext0      = "#909090"
 text          = "#EDEDED"
+# Bright chip. herdr has no underline-style tab, so the active tab is always a
+# filled block; mid-gray made the label unreadable, so back to near-white.
 accent        = "#E8E8E8"
 
 [ui]
@@ -25,12 +31,29 @@ show_agent_labels_on_pane_borders = true
 
 agent_panel_sort = "spaces"
 
-# Kill the periwinkle tab chip. Conductor marks the active tab with light,
-# not with hue.
+# Matches theme.custom.accent above.
 accent = "#E8E8E8"
+
+# One tab needs no tab row.
+hide_tab_bar_when_single_tab = true
 
 [ui.toast]
 delivery = "terminal"
+
+# Per-token colors for the sidebar rows. Defaults leaned on kanagawa's chromatic
+# tokens (purple branches) and on `dim`, which made the tab and agent names
+# nearly unreadable against the lifted sidebar. Explicit neutrals instead.
+[ui.sidebar.spaces]
+rows = [
+  ["state_icon", "workspace"],
+  [{ token = "branch", fg = "#8A8A8A", dim = false }, "git_status"],
+]
+
+[ui.sidebar.agents]
+rows = [
+  ["state_icon", "workspace", { token = "tab", fg = "#B4B4B4", dim = false }],
+  [{ token = "agent", fg = "#8A8A8A", dim = false }],
+]
 
 [keys]
 # Carried over from tmux muscle-memory; the tmux config itself is gone, the

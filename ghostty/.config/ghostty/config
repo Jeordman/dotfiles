@@ -4,7 +4,9 @@ theme = "Apple System Colors"
 
 # Neutral near-black to match Conductor. The old 141110 was warm/brown,
 # which fought the cool grays in herdr and nvim.
-background = 0f0f0f
+# This is the innermost surface and the darkest of the three:
+# herdr sidebar #161616 -> herdr panel #101010 -> this.
+background = 0c0c0c
 
 # Neutral selection and cursor instead of the theme's blue.
 selection-background = 2a2a2a
@@ -22,6 +24,14 @@ background-blur-radius = 10
 
 font-size = 16
 font-family = "Hack Nerd Font"
+
+# Conductor breathes; a terminal grid does not unless you tell it to.
+window-padding-x = 12
+window-padding-y = 8
+
+# Loosens every row ~10%. herdr's row_gap is integer-only (0 or a full blank
+# line, which was too much), so line height is the fine-grained lever.
+adjust-cell-height = 10%
 
 title = " "
 
