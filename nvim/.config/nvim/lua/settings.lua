@@ -1,4 +1,4 @@
---  NOTE: Must happen befoautopairsre plugins are loaded (otherwise wrong leader will be used)
+--  NOTE: Must happen before plugins are loaded (otherwise wrong leader will be used)
 vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
@@ -74,10 +74,6 @@ vim.opt.foldmethod = 'indent'
 vim.opt.foldenable = true
 vim.opt.foldlevel = 99
 vim.opt.foldlevelstart = 99
--- Show fold column in the gutter (0 to hide, 1 to show minimal)
-vim.opt.foldcolumn = '0'
--- Minimum lines for a fold to be created
-vim.opt.foldminlines = 1
 
 -- if performing an operation that would fail due to unsaved changes in the buffer (like `:q`),
 -- instead raise a dialog asking if you wish to save the current file(s)
@@ -145,6 +141,101 @@ vim.api.nvim_create_autocmd('BufReadPre', {
   end,
 })
 
+-- Minimal mode: strip every per-buffer feature that makes a huge file crawl.
+-- Shared by the BufReadPost detector and the <leader>tl toggle.
+local function enter_minimal_mode(buf)
+  vim.b[buf].large_file = true
+
+  vim.api.nvim_buf_call(buf, function()
+    -- Kill ALL syntax/highlighting
+    vim.cmd 'syntax clear'
+    vim.cmd 'syntax off'
+    vim.bo[buf].syntax = ''
+    vim.bo[buf].filetype = ''
+    pcall(vim.treesitter.stop, buf)
+
+    -- Disable visual overhead
+    vim.opt_local.cursorline = false
+    vim.opt_local.cursorcolumn = false
+    vim.opt_local.relativenumber = false
+    vim.opt_local.number = false
+    vim.opt_local.signcolumn = 'no'
+    vim.opt_local.colorcolumn = ''
+    vim.opt_local.list = false
+    vim.opt_local.wrap = false
+
+    -- Disable folding
+    vim.opt_local.foldmethod = 'manual'
+    vim.opt_local.foldenable = false
+
+    -- Disable file features
+    vim.opt_local.spell = false
+    vim.opt_local.swapfile = false
+    vim.opt_local.undofile = false
+    vim.opt_local.undolevels = 100
+
+    -- Disable matchparen (highlights matching brackets)
+    pcall(vim.cmd, 'NoMatchParen')
+  end)
+
+  -- Detach the plugins that walk the whole buffer
+  vim.schedule(function()
+    for _, client in ipairs(vim.lsp.get_clients { bufnr = buf }) do
+      vim.lsp.buf_detach_client(buf, client.id)
+    end
+  end)
+  pcall(function() require('gitsigns').detach(buf) end)
+  pcall(function() require('ibl').setup_buffer(buf, { enabled = false }) end)
+  vim.b[buf].miniindentscope_disable = true
+  vim.b[buf].minicursorword_disable = true
+
+  vim.notify('Large file - minimal mode', vim.log.levels.WARN)
+end
+
+-- Undo enter_minimal_mode: restore this buffer to the global defaults.
+local function restore_full_mode(buf)
+  vim.b[buf].large_file = false
+
+  vim.api.nvim_buf_call(buf, function()
+    -- Re-detect filetype (re-enables syntax, treesitter, filetype plugins)
+    vim.cmd 'filetype detect'
+    vim.cmd 'syntax on'
+
+    vim.opt_local.cursorline = true
+    vim.opt_local.cursorcolumn = false
+    vim.opt_local.relativenumber = false
+    vim.opt_local.number = true
+    vim.opt_local.signcolumn = 'yes'
+    vim.opt_local.colorcolumn = '80'
+    vim.opt_local.list = true
+    vim.opt_local.wrap = false
+
+    vim.opt_local.foldmethod = 'indent'
+    vim.opt_local.foldenable = true
+
+    vim.opt_local.spell = false
+    vim.opt_local.swapfile = true
+    vim.opt_local.undofile = true
+    vim.opt_local.undolevels = 1000
+
+    pcall(vim.cmd, 'DoMatchParen')
+  end)
+
+  vim.schedule(function()
+    for _, client in ipairs(vim.lsp.get_clients()) do
+      if not vim.lsp.buf_is_attached(buf, client.id) then
+        pcall(vim.lsp.buf_attach_client, buf, client.id)
+      end
+    end
+  end)
+  pcall(function() require('gitsigns').attach(buf) end)
+  pcall(function() require('ibl').setup_buffer(buf, { enabled = true }) end)
+  vim.b[buf].miniindentscope_disable = false
+  vim.b[buf].minicursorword_disable = false
+
+  vim.notify('Large file - full mode restored', vim.log.levels.INFO)
+end
+
 -- After reading, apply full restrictions
 vim.api.nvim_create_autocmd('BufReadPost', {
   group = large_file_group,
@@ -163,160 +254,22 @@ vim.api.nvim_create_autocmd('BufReadPost', {
     end
 
     if vim.b[buf].large_file then
-      vim.notify('Large file - minimal mode', vim.log.levels.WARN)
-
-      -- Reset buftype so we can edit/save
+      -- Reset buftype so we can edit/save (BufReadPre set it to 'nowrite')
       vim.bo[buf].buftype = ''
       vim.opt_local.eventignore = ''
-
-      -- Kill ALL syntax/highlighting
-      vim.cmd('syntax clear')
-      vim.cmd('syntax off')
-      vim.bo[buf].syntax = ''
-      vim.bo[buf].filetype = ''
-      pcall(vim.treesitter.stop, buf)
-
-      -- Disable visual overhead
-      vim.opt_local.cursorline = false
-      vim.opt_local.cursorcolumn = false
-      vim.opt_local.relativenumber = false
-      vim.opt_local.number = false
-      vim.opt_local.signcolumn = 'no'
-      vim.opt_local.colorcolumn = ''
-      vim.opt_local.list = false
-      vim.opt_local.wrap = false
-
-      -- Disable folding
-      vim.opt_local.foldmethod = 'manual'
-      vim.opt_local.foldenable = false
-
-      -- Disable file features
-      vim.opt_local.spell = false
-      vim.opt_local.swapfile = false
-      vim.opt_local.undofile = false
-      vim.opt_local.undolevels = 100
-
-      -- Disable matchparen (the highlight matching brackets plugin)
-      vim.cmd('NoMatchParen')
-
-      -- Detach LSP
-      vim.schedule(function()
-        for _, client in ipairs(vim.lsp.get_clients({ bufnr = buf })) do
-          vim.lsp.buf_detach_client(buf, client.id)
-        end
-      end)
-
-      -- Detach gitsigns
-      pcall(function() require('gitsigns').detach(buf) end)
-
-      -- Disable indent-blankline
-      pcall(function() require('ibl').setup_buffer(buf, { enabled = false }) end)
-
-      -- Disable mini plugins for this buffer
-      pcall(function() vim.b[buf].miniindentscope_disable = true end)
-      pcall(function() vim.b[buf].minicursorword_disable = true end)
+      enter_minimal_mode(buf)
     end
   end,
 })
 
--- Toggle large file minimal mode off/on for the current buffer
-local function toggle_large_file_mode()
+vim.keymap.set('n', '<leader>tl', function()
   local buf = vim.api.nvim_get_current_buf()
-
   if vim.b[buf].large_file then
-    -- Restore full mode
-    vim.b[buf].large_file = false
-
-    -- Re-detect filetype (re-enables syntax, treesitter, filetype plugins)
-    vim.cmd('filetype detect')
-    vim.cmd('syntax on')
-
-    -- Restore visual settings to global defaults
-    vim.opt_local.cursorline = true
-    vim.opt_local.relativenumber = false
-    vim.opt_local.number = true
-    vim.opt_local.signcolumn = 'yes'
-    vim.opt_local.colorcolumn = '80'
-    vim.opt_local.list = true
-    vim.opt_local.wrap = false
-
-    -- Restore folding
-    vim.opt_local.foldmethod = 'indent'
-    vim.opt_local.foldenable = true
-
-    -- Restore file features
-    vim.opt_local.swapfile = true
-    vim.opt_local.undofile = true
-    vim.opt_local.undolevels = 1000
-
-    -- Re-enable matchparen
-    pcall(vim.cmd, 'DoMatchParen')
-
-    -- Re-attach LSP
-    vim.schedule(function()
-      for _, client in ipairs(vim.lsp.get_clients()) do
-        if not vim.lsp.buf_is_attached(buf, client.id) then
-          pcall(vim.lsp.buf_attach_client, buf, client.id)
-        end
-      end
-    end)
-
-    -- Re-attach gitsigns
-    pcall(function() require('gitsigns').attach(buf) end)
-
-    -- Re-enable indent-blankline
-    pcall(function() require('ibl').setup_buffer(buf, { enabled = true }) end)
-
-    -- Re-enable mini plugins
-    pcall(function() vim.b[buf].miniindentscope_disable = false end)
-    pcall(function() vim.b[buf].minicursorword_disable = false end)
-
-    vim.notify('Large file - full mode restored', vim.log.levels.INFO)
+    restore_full_mode(buf)
   else
-    -- Enter minimal mode manually
-    vim.b[buf].large_file = true
-
-    vim.cmd('syntax clear')
-    vim.cmd('syntax off')
-    vim.bo[buf].syntax = ''
-    vim.bo[buf].filetype = ''
-    pcall(vim.treesitter.stop, buf)
-
-    vim.opt_local.cursorline = false
-    vim.opt_local.cursorcolumn = false
-    vim.opt_local.relativenumber = false
-    vim.opt_local.number = false
-    vim.opt_local.signcolumn = 'no'
-    vim.opt_local.colorcolumn = ''
-    vim.opt_local.list = false
-    vim.opt_local.wrap = false
-
-    vim.opt_local.foldmethod = 'manual'
-    vim.opt_local.foldenable = false
-
-    vim.opt_local.spell = false
-    vim.opt_local.swapfile = false
-    vim.opt_local.undofile = false
-    vim.opt_local.undolevels = 100
-
-    pcall(vim.cmd, 'NoMatchParen')
-
-    vim.schedule(function()
-      for _, client in ipairs(vim.lsp.get_clients({ bufnr = buf })) do
-        vim.lsp.buf_detach_client(buf, client.id)
-      end
-    end)
-
-    pcall(function() require('gitsigns').detach(buf) end)
-    pcall(function() require('ibl').setup_buffer(buf, { enabled = false }) end)
-    pcall(function() vim.b[buf].miniindentscope_disable = true end)
-    pcall(function() vim.b[buf].minicursorword_disable = true end)
-
-    vim.notify('Large file - minimal mode', vim.log.levels.WARN)
+    enter_minimal_mode(buf)
   end
-end
-
-vim.keymap.set('n', '<leader>tl', toggle_large_file_mode, { desc = '[T]oggle [L]arge file mode' })
+end, { desc = '[T]oggle [L]arge file mode' })
 
 -- [[ Fast Quit ]]
 -- Stop LSP clients immediately on quit to avoid slow shutdown
@@ -330,15 +283,6 @@ vim.api.nvim_create_autocmd('VimLeavePre', {
 
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
-
--- Ensure folding is set up properly for each buffer
-vim.api.nvim_create_autocmd({'BufReadPost', 'FileReadPost'}, {
-  pattern = '*',
-  callback = function()
-    vim.opt_local.foldmethod = 'indent'
-    vim.opt_local.foldlevel = 99
-  end,
-})
 
 -- Highlight when yanking (copying) text
 --  Try it with `yap` in normal mode
@@ -385,39 +329,3 @@ if not vim.uv.fs_stat(lazypath) then
   end
 end ---@diagnostic disable-next-line: undefined-field
 vim.opt.rtp:prepend(lazypath)
-
--- -- Set autoread option
--- vim.o.autoread = true
---
--- -- Autocmds to check for changes when Neovim gains focus, enters a buffer, or is idle
--- vim.api.nvim_create_augroup('CheckForChanges', { clear = true })
--- vim.api.nvim_create_autocmd({ 'FocusGained', 'BufEnter', 'CursorHold', 'CursorHoldI' }, {
---   group = 'CheckForChanges',
---   callback = function()
---     if vim.fn.mode() ~= 'c' then -- Avoid running in command mode
---       vim.cmd 'checktime'
---     end
---   end,
--- })
-
--- -- Optional: Add a notification after a file has been reloaded from disk
--- vim.api.nvim_create_autocmd({ 'FileChangedShellPost' }, {
---   group = 'CheckForChanges',
---   callback = function()
---     vim.notify('File changed on disk. Buffer reloaded.', vim.log.levels.INFO, {})
---   end,
--- })
-
--- override :e to refresh all buffers, staying on the current buffer
--- vim.api.nvim_create_autocmd('CmdlineLeave', {
---   pattern = '*',
---   callback = function()
---     if vim.fn.getcmdline():match('^e!?$') then
---       vim.schedule(function()
---         local current_buf = vim.api.nvim_get_current_buf()
---         vim.cmd('bufdo e')
---         vim.api.nvim_set_current_buf(current_buf)
---       end)
---     end
---   end
--- })

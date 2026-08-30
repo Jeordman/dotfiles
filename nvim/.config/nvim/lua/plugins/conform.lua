@@ -69,9 +69,9 @@ return { -- code formatter
       json = { 'prettier', 'biome', 'jq' },
       yaml = { 'prettier' },
       markdown = { 'prettier' },
-      css = { 'prettier', 'biome', 'stylelint' },
-      scss = { 'prettier', 'stylelint' },
-      less = { 'prettier', 'stylelint' },
+      css = { 'prettier', 'biome' },
+      scss = { 'prettier' },
+      less = { 'prettier' },
       html = { 'prettier' },
     },
     formatters = {
