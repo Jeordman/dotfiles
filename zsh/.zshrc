@@ -60,8 +60,12 @@ ZSH_THEME="powerlevel10k/powerlevel10k"
 # Custom plugins may be added to $ZSH_CUSTOM/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
+# The git plugin is deliberately absent: it defines 197 aliases (gst, gco, gp, ...)
+# and 3667 lines of shell history show none of them ever being used — `git` gets
+# typed in full. Loading it cost ~41ms per shell. The prompt's git status comes
+# from powerlevel10k's gitstatus daemon, not from this plugin, so nothing visible
+# changes. Add `git` back to this list if you ever want the aliases.
 plugins=(
-  git
   zsh-autosuggestions
   zsh-syntax-highlighting
 )
@@ -276,9 +280,11 @@ claude() {
   command claude --remote-control "$name" "${effort[@]}" "$@"
 }
 
-# thefuck is Python-based and has no working package on recent Ubuntu (Python 3.12),
-# so this must be guarded or every new shell on those boxes starts with a traceback.
-command -v thefuck >/dev/null && eval "$(thefuck --alias)"
+# thefuck is gone on purpose. `thefuck --alias` spawns Python on every single
+# shell and was the most expensive line in this file at ~87ms, while `fuck` was
+# run 0 times in 3667 lines of history. If you want it back, prefer a lazy stub
+# over the eval so the Python startup only happens the first time you call it:
+#   fuck() { unset -f fuck; eval "$(thefuck --alias)"; fuck "$@" }
 
 # run 'l' to list files after cd
 chpwd() {
