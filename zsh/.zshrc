@@ -202,7 +202,27 @@ alias v='nvim'
 alias c='claude'  # naming is handled by the claude() wrapper further down
 alias h='herdr'
 alias cc='codex'
-alias cr='codex exec review --base main --uncommitted'
+# `cr` = claude resume: pick up the most recent session for this directory,
+# which is what `claude --resume <uuid>` prints on quit. Sessions live as
+# ~/.claude/projects/<cwd with every non-alphanumeric turned into a dash>/<uuid>.jsonl,
+# so the newest .jsonl there is the session last written to. Extra args pass
+# through to claude. `cr -l` just lists the candidates.
+cr() {
+  local slug dir
+  local -a sessions
+  slug="${PWD//[^a-zA-Z0-9]/-}"
+  dir="$HOME/.claude/projects/$slug"
+  if [[ "${1-}" == "-l" ]]; then
+    ls -lt "$dir"/*.jsonl 2>/dev/null || print -u2 "cr: no Claude sessions recorded for $PWD"
+    return
+  fi
+  sessions=("$dir"/*.jsonl(Nom))
+  if (( ! $#sessions )); then
+    print -u2 "cr: no Claude sessions recorded for $PWD"
+    return 1
+  fi
+  claude --resume "${${sessions[1]:t}:r}" "$@"
+}
 alias t='tuicr'
 alias multipull="find . -mindepth 1 -maxdepth 1 -type d ! -name '.*' -print -exec git -C {} pull \;"
 # alias multimain='find . -mindepth 1 -maxdepth 1 -type d -print -exec sh -c '\''cd "$1" && (git checkout main 2>/dev/null || git checkout master)'\'' _ {} \;'
