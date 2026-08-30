@@ -54,7 +54,7 @@ return {
     local white = '#c6c1a9'
     local blue = '#7aa2f7'
     local green = '#a6e3a1'
-    local red = '#f38ba8'
+    local red = '#D95F5F'
 
     local function set_neotree_git_hl()
       vim.api.nvim_set_hl(0, 'NeoTreeFileName', { fg = white })
