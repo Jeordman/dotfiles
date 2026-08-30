@@ -3,10 +3,32 @@ onboarding = false
 name = "kanagawa"
 auto_switch = false
 
+[theme.custom]
+# Conductor-style: neutral near-black surfaces, tiny value gaps between them,
+# no colored accent in the chrome. Base theme stays kanagawa so the chromatic
+# tokens it supplies (status dots, git status) keep their meaning.
+panel_bg      = "#0F0F0F"
+sidebar_bg    = "#0D0D0D"
+surface_dim   = "#111111"
+surface0      = "#161616"
+surface1      = "#1F1F1F"
+active_row_bg = "#212121"
+selection_bg  = "#2A2A2A"
+overlay0      = "#5A5A5A"
+overlay1      = "#767676"
+subtext0      = "#909090"
+text          = "#EDEDED"
+accent        = "#E8E8E8"
+
 [ui]
 show_agent_labels_on_pane_borders = true
 
 agent_panel_sort = "spaces"
+
+# Kill the periwinkle tab chip. Conductor marks the active tab with light,
+# not with hue.
+accent = "#E8E8E8"
+
 [ui.toast]
 delivery = "terminal"
 

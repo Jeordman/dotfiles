@@ -2,9 +2,14 @@
 # cmux uses libghostty + this bundled theme; its bg is already #1e1e1e.
 theme = "Apple System Colors"
 
-# Redundant with the theme's bg (#1e1e1e) but kept to document intent:
-# The Spire terminal background (sampled: rgb 30,30,30)
-background = 1e1e1e
+# Neutral near-black to match Conductor. The old 141110 was warm/brown,
+# which fought the cool grays in herdr and nvim.
+background = 0f0f0f
+
+# Neutral selection and cursor instead of the theme's blue.
+selection-background = 2a2a2a
+selection-foreground = ededed
+cursor-color = d0d0d0
 
 # Set background transparency (0.0 = fully transparent, 1.0 = opaque)
 background-opacity = 1
