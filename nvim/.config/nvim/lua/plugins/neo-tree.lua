@@ -55,8 +55,16 @@ return {
     local blue = '#7aa2f7'
     local green = '#a6e3a1'
     local red = '#D95F5F'
+    -- Matches herdr's sidebar_bg so the tree reads as chrome, not buffer.
+    local sidebar_bg = '#161616'
 
     local function set_neotree_git_hl()
+      vim.api.nvim_set_hl(0, 'NeoTreeNormal', { fg = white, bg = sidebar_bg })
+      vim.api.nvim_set_hl(0, 'NeoTreeNormalNC', { fg = white, bg = sidebar_bg })
+      vim.api.nvim_set_hl(0, 'NeoTreeEndOfBuffer', { fg = sidebar_bg, bg = sidebar_bg })
+      vim.api.nvim_set_hl(0, 'NeoTreeWinSeparator', { fg = sidebar_bg, bg = sidebar_bg })
+      vim.api.nvim_set_hl(0, 'NeoTreeCursorLine', { bg = '#242424' })
+
       vim.api.nvim_set_hl(0, 'NeoTreeFileName', { fg = white })
       vim.api.nvim_set_hl(0, 'NeoTreeFileNameOpened', { fg = white })
       vim.api.nvim_set_hl(0, 'NeoTreeDirectoryName', { fg = white })
