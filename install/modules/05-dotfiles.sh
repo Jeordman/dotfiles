@@ -148,9 +148,12 @@ log_info "Creating symlinks with GNU Stow..."
 # codex itself and carries machine-specific state (a /Applications/ChatGPT.app
 # MCP server with a 120s startup timeout, absolute CODEX_HOME, per-project trust
 # entries keyed by /Users paths). Its portable half, AGENTS.md, is linked below.
+#
+# hammerspoon is macOS-only by nature: it is a macOS automation app, and its
+# init.lua taps Cmd+V for Ghostty image paste (see hammerspoon/.hammerspoon/init.lua).
 STOW_PACKAGES=(bin btop claude git herdr nvim tuicr yazi zsh)
 if [[ "$OS_TYPE" == "macos" ]]; then
-    STOW_PACKAGES+=(ghostty codex lazygit)
+    STOW_PACKAGES+=(ghostty codex lazygit hammerspoon)
 fi
 
 if [[ "$DRY_RUN" == "true" ]]; then
@@ -214,6 +217,21 @@ else
         log_error "stow is all-or-nothing: fix the conflict above and re-run"
         log_info "You can try manually: cd $DOTFILES_DIR && stow -R ${stow_targets[*]}"
         STOW_FAILED=true
+    fi
+fi
+
+# Hammerspoon must run at least once for init.lua to take effect: that is what
+# registers the login item (hs.autoLaunch) and triggers the Accessibility
+# prompt. Deliberately after stow — launching before ~/.hammerspoon exists makes
+# Hammerspoon write its own default init.lua, which then collides with stow on
+# the next run. Accessibility itself cannot be granted from a script (TCC), so
+# one manual approval per machine is unavoidable.
+if [[ "$OS_TYPE" == "macos" && "$STOW_FAILED" != "true" && -d /Applications/Hammerspoon.app ]]; then
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[DRY RUN] Would launch Hammerspoon to register its login item"
+    else
+        open -a Hammerspoon
+        log_info "Hammerspoon launched — approve the Accessibility prompt to enable Cmd+V image paste"
     fi
 fi
 

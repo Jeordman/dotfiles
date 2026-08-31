@@ -246,6 +246,18 @@ if [[ "$OS_TYPE" == "macos" ]]; then
     fi
 fi
 
+# Hammerspoon (macOS only) — powers Cmd+V image paste into terminal coding
+# agents. Ghostty cannot branch on clipboard contents itself (its `performable:`
+# prefix is a no-op on macOS, ghostty-org/ghostty#11444), so the event tap in
+# hammerspoon/.hammerspoon/init.lua makes the decision instead.
+#
+# Install only. Launching it (which registers the login item via hs.autoLaunch
+# and raises the Accessibility prompt) happens in 05-dotfiles.sh, after its
+# config has been stowed. Approving that prompt is the one manual step left.
+if [[ "$OS_TYPE" == "macos" ]]; then
+    install_cask hammerspoon "Hammerspoon"
+fi
+
 # Node Version Manager (NVM)
 log_info "Setting up NVM (Node Version Manager)..."
 if [ ! -d "$HOME/.nvm" ]; then
