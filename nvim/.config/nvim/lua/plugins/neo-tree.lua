@@ -27,6 +27,17 @@ return {
           ['/'] = 'noop',
         },
       },
+      filesystem = {
+        window = {
+          mappings = {
+            -- jump between git-changed entries with ]c / [c instead of ]g / [g
+            ['[g'] = 'noop',
+            [']g'] = 'noop',
+            ['[c'] = 'prev_git_modified',
+            [']c'] = 'next_git_modified',
+          },
+        },
+      },
       default_component_configs = {
         -- color the file NAME by git status, not just the trailing symbol
         name = {
