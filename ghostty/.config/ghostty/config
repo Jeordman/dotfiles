@@ -22,7 +22,7 @@ background-blur = true
 # Optional: adjust the amount of blur if Ghostty supports it
 background-blur-radius = 10
 
-font-size = 16
+font-size = 17
 font-family = "Hack Nerd Font"
 
 # Conductor breathes; a terminal grid does not unless you tell it to.
