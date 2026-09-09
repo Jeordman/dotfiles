@@ -235,6 +235,46 @@ if [[ "$OS_TYPE" == "macos" && "$STOW_FAILED" != "true" && -d /Applications/Hamm
     fi
 fi
 
+# Regenerate the bundled herdr control skill from the installed binary.
+#
+# `herdr --skill` prints a skill file that is pinned to the binary that printed
+# it: herdr 0.9.0 warns that CLI syntax and agent lifecycle behavior change
+# between releases, so a stale copy teaches Claude commands that no longer
+# exist. Committing the generated file keeps it available on machines without
+# herdr; regenerating here keeps it honest on machines that have it.
+#
+# Writes into the repo (not $HOME) because stow links claude/.claude/skills.
+refresh_herdr_skill() {
+    local dst="$DOTFILES_DIR/claude/.claude/skills/herdr/SKILL.md"
+
+    if ! command -v herdr >/dev/null 2>&1; then
+        log_info "herdr not installed — keeping the committed herdr skill as-is"
+        return 0
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[DRY RUN] Would regenerate $dst from herdr $(herdr --version 2>/dev/null | awk '{print $2}')"
+        return 0
+    fi
+
+    mkdir -p "$(dirname "$dst")"
+
+    # Write via a temp file so a failed/empty run cannot truncate the committed
+    # skill. herdr exits non-zero if the bundled skill is missing (some Nix
+    # builds shipped without it).
+    local tmp
+    tmp=$(mktemp)
+    if herdr --skill >"$tmp" 2>/dev/null && [ -s "$tmp" ]; then
+        mv "$tmp" "$dst"
+        log_success "herdr skill regenerated from herdr $(herdr --version 2>/dev/null | awk '{print $2}')"
+    else
+        rm -f "$tmp"
+        log_warning "herdr --skill produced nothing — keeping the committed herdr skill"
+    fi
+}
+
+refresh_herdr_skill
+
 # Share curated Claude config with the per-directory "personal" account.
 # ~/.claude-personal is the config dir used when CLAUDE_CONFIG_DIR points at it
 # (see ~/personal/.envrc and docs/direnv.md). It reuses the SAME dotfiles sources

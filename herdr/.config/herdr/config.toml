@@ -37,21 +37,53 @@ accent = "#E8E8E8"
 # One tab needs no tab row.
 hide_tab_bar_when_single_tab = true
 
+# pane_borders stays at the default "auto" (split panes only). 0.9.0 added
+# "always", which also frames a lone pane; tried 2026-09-08 and reverted. The
+# theme above builds elevation from value gaps between surfaces, not strokes,
+# so a 1px overlay0 line against near-black was invisible enough to be
+# indistinguishable and, when noticed, read as an artifact. With one pane and
+# the tab bar hidden it was the only line on screen. pane_gaps (default true)
+# already exposes the panel_bg layer as area, which is the intended language.
+
+status_indicators = "dots"
 [ui.toast]
 delivery = "terminal"
+
+# Separate delivery path from the cmux notification hooks, which are
+# best-effort and silently drop alerts under load.
+[ui.sound]
+enabled = true
 
 # Per-token colors for the sidebar rows. Defaults leaned on kanagawa's chromatic
 # tokens (purple branches) and on `dim`, which made the tab and agent names
 # nearly unreadable against the lifted sidebar. Explicit neutrals instead.
 [ui.sidebar.spaces]
+# 0.9.0 value rules: one condition per rule (equals/contains/starts_with/gt/lt),
+# first match wins, unmatched falls through to the token's base style.
+# git_status stays unstyled on purpose: an fg override there flattens its
+# built-in green/red ahead-behind counts into a single color.
 rows = [
   ["state_icon", "workspace"],
-  [{ token = "branch", fg = "#8A8A8A", dim = false }, "git_status"],
+  [{ token = "branch", fg = "#8A8A8A", dim = false, rules = [
+     { equals = "main",   fg = "#FF9E3B" },
+     { equals = "master", fg = "#FF9E3B" },
+   ] }, "git_status"],
 ]
 
 [ui.sidebar.agents]
+# state_text colors mirror bin/bin/herdr-agent-picker so the sidebar and the
+# prefix+a popup agree on what a status means:
+#   blocked -> peachRed    (permission prompt: unblock me now)
+#   idle    -> roninYellow (waiting on your input)
+#   done    -> springGreen (finished, go look)
+#   working/unknown -> base grey (leave it alone)
 rows = [
-  ["state_icon", "workspace", { token = "tab", fg = "#B4B4B4", dim = false }],
+  ["state_icon", "workspace", { token = "tab", fg = "#B4B4B4", dim = false },
+   { token = "state_text", fg = "#8A8A8A", dim = false, rules = [
+     { equals = "blocked", fg = "#FF5D62", bold = true },
+     { equals = "idle",    fg = "#FF9E3B" },
+     { equals = "done",    fg = "#98BB6C" },
+   ] }],
   [{ token = "agent", fg = "#8A8A8A", dim = false }],
 ]
 
@@ -69,6 +101,12 @@ split_horizontal = "prefix+quote"    # tmux: bind '"' -> stacked panes
 split_vertical = "prefix+percent"    # tmux: bind % -> side-by-side panes
 # focus_pane_{left,down,up,right} = prefix+h/j/k/l already match tmux defaults
 # new_tab = prefix+c already matches tmux `bind c new-window`
+
+# Optional bindings added in 0.8.0, unset by default. All three are tmux
+# muscle-memory that the original port had no herdr equivalent for.
+last_pane = "prefix+semicolon"           # tmux: bind ';' last-pane
+move_tab_previous = "prefix+shift+comma" # tmux: bind '<' swap-window -t -1
+move_tab_next = "prefix+shift+period"    # tmux: bind '>' swap-window -t +1
 
 # Navigate-mode (goto, prefix+w): vim j/k walk the spaces list instead of arrows.
 # This takes j/k off pane up/down, so arrows drive pane vertical (arrows already
@@ -98,6 +136,11 @@ height = "60%"
 resume_agents_on_restore = true
 
 [experimental]
+# The other half of session.resume_agents_on_restore below: that brings the
+# agent's conversation back after a restart, this brings its scrollback back.
+# Without it a resumed pane returns with an empty screen.
+pane_history = true
+
 # Forward Kitty graphics to the outer terminal so image previews render inside
 # herdr panes (yazi, etc.). Outer terminal is Ghostty, which supports KGP.
 # Without this herdr eats the escapes and yazi falls back to chafa.
