@@ -24,7 +24,7 @@ sel=$(
         # Kanagawa-ish palette. Only rows that WANT something from you get
         # colour; everything else recedes to grey so the live ones pop.
         #   blocked -> peachRed   (permission prompt: unblock me now)
-        #   idle    -> roninYellow (waiting on your input)
+        #   idle    -> carpYellow   (waiting on your input)
         #   done    -> springGreen (finished, go look)
         #   working -> grey        (leave it alone)
         BEGIN {
@@ -32,7 +32,7 @@ sel=$(
           DIM = "\033[38;2;114;113;105m"   # fujiGray
           FG  = "\033[38;2;220;215;186m"   # fujiWhite
           c["blocked"] = "\033[1;38;2;255;93;98m"
-          c["idle"]    = "\033[38;2;255;158;59m"
+          c["idle"]    = "\033[38;2;230;195;132m"
           c["done"]    = "\033[38;2;152;187;108m"
           c["working"] = DIM
           c["unknown"] = DIM

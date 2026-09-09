@@ -62,11 +62,24 @@ enabled = true
 # first match wins, unmatched falls through to the token's base style.
 # git_status stays unstyled on purpose: an fg override there flattens its
 # built-in green/red ahead-behind counts into a single color.
+#
+# main/master is a CAUTION: a commit here lands on the trunk. It shares
+# carpYellow with the agent rows' `idle` state on purpose — one "wants your
+# attention" yellow across the whole sidebar rather than a separate shade per
+# meaning. The two never appear in the same row (Spaces vs Agents are separate
+# panels), so the shared color reads as one register, not as ambiguity.
+#
+# Rejected: roninYellow #FF9E3B, the original pick, sat 20 degrees off carpYellow
+# — close enough to look like a mistake rather than a match. Also rejected:
+# crystalBlue #7E9CD8, which separates cleanly (118 degrees) but is the calmest
+# hue on the wheel, so it argued against the warning this rule exists to give;
+# and #CCA694 (Conductor's --status-done), warm but at C 0.052 too quiet to
+# register as a caution at a glance.
 rows = [
   ["state_icon", "workspace"],
   [{ token = "branch", fg = "#8A8A8A", dim = false, rules = [
-     { equals = "main",   fg = "#FF9E3B" },
-     { equals = "master", fg = "#FF9E3B" },
+     { equals = "main",   fg = "#E6C384" },
+     { equals = "master", fg = "#E6C384" },
    ] }, "git_status"],
 ]
 
@@ -74,14 +87,14 @@ rows = [
 # state_text colors mirror bin/bin/herdr-agent-picker so the sidebar and the
 # prefix+a popup agree on what a status means:
 #   blocked -> peachRed    (permission prompt: unblock me now)
-#   idle    -> roninYellow (waiting on your input)
+#   idle    -> carpYellow   (waiting on your input)
 #   done    -> springGreen (finished, go look)
 #   working/unknown -> base grey (leave it alone)
 rows = [
   ["state_icon", "workspace", { token = "tab", fg = "#B4B4B4", dim = false },
    { token = "state_text", fg = "#8A8A8A", dim = false, rules = [
      { equals = "blocked", fg = "#FF5D62", bold = true },
-     { equals = "idle",    fg = "#FF9E3B" },
+     { equals = "idle",    fg = "#E6C384" },
      { equals = "done",    fg = "#98BB6C" },
    ] }],
   [{ token = "agent", fg = "#8A8A8A", dim = false }],
