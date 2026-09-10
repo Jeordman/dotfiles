@@ -26,6 +26,19 @@ text          = "#EDEDED"
 # filled block; mid-gray made the label unreadable, so back to near-white.
 accent        = "#E8E8E8"
 
+# Status dots. herdr colors state_icon from the palette, never from the
+# ui.sidebar rules below — state_icon carries no text value, so `rules` can't
+# match it (src/client/shell.rs status_color: working=yellow, blocked=red,
+# done=teal, idle=green, unknown=overlay0). Remap those four so the dots land
+# in the same register as the state_text rules.
+# Collateral, accepted: green also paints the git ahead count, the endpoint
+# "online" dot and the settings "installed" check; yellow also paints
+# connecting/reconnecting, "update available" and the status-bar highlight bg.
+red    = "#FF5D62"  # blocked
+green  = "#E6C384"  # idle    — no longer a green
+teal   = "#98BB6C"  # done
+yellow = "#8A8A8A"  # working — no longer a yellow
+
 [ui]
 show_agent_labels_on_pane_borders = true
 

@@ -17,6 +17,11 @@ return {
   keys = {
     { '<leader>ga', '<cmd>LazyGit<cr>', desc = 'LazyGit' },
   },
+  init = function()
+    -- Float size as a fraction of the editor, width and height together.
+    -- Plugin default is 0.9; set before load so its !exists() guard keeps this.
+    vim.g.lazygit_floating_window_scaling_factor = 0.92
+  end,
   config = function()
     -- lazygit has no background setting of its own, so the float's bg is what
     -- shows through its panels. #161616 is herdr's sidebar_bg.

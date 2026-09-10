@@ -1,5 +1,6 @@
 gui:
   disableStartupPopups: true
+  showCommandLog: false
   theme:
     # Neutral surfaces from herdr/catppuccin; #3A3A3A is nvim's FloatBorder.
     activeBorderColor: ['#E8E8E8']
