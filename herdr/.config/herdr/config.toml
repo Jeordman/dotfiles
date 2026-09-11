@@ -47,8 +47,9 @@ agent_panel_sort = "spaces"
 # Matches theme.custom.accent above.
 accent = "#E8E8E8"
 
-# One tab needs no tab row.
-hide_tab_bar_when_single_tab = true
+# Tab row always on, even for a single tab. Hiding it made the row appear and
+# disappear as tabs came and went, which shifted the pane contents down a line.
+hide_tab_bar_when_single_tab = false
 
 # pane_borders stays at the default "auto" (split panes only). 0.9.0 added
 # "always", which also frames a lone pane; tried 2026-09-08 and reverted. The
