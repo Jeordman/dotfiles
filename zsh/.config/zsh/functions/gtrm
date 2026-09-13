@@ -1,0 +1,94 @@
+# gtrm [--force] — remove the worktree you are standing in, from inside it.
+#
+# Removes the tree, deletes the branch, closes the herdr Space, and leaves you
+# in the main checkout.
+#
+# Why this is a shell function and not a script in bin/: `git gtr rm <branch>`
+# run from inside its own target removes the tree and exits 0, but gtr reads its
+# hook config with a plain `git config` afterwards. From the now-deleted cwd
+# that call dies with "Unable to read current working directory",
+# _hooks_get_trusted comes back empty, run_hooks decides there are no hooks and
+# returns 0 — so gtr-postremove silently never deletes the branch, with nothing
+# printed. cd'ing to the main checkout first is the fix, and only the calling
+# shell can do that. `gtr rm` also has no `.` identifier (core.sh resolve_target
+# knows `1` and branch names), so the branch is derived here.
+#
+# --force skips the uncommitted/unpushed guard, spelled as `git gtr rm` spells it.
+
+local force=0
+[[ "${1-}" == "--force" ]] && { force=1; shift }
+
+local git_dir common_dir root branch wt ws_map ws_id dirty ahead
+
+git_dir=$(git rev-parse --absolute-git-dir 2>/dev/null) || {
+  print -ru2 -- "gtrm: not in a git repository"
+  return 1
+}
+common_dir=$(git rev-parse --path-format=absolute --git-common-dir)
+
+# Same path in the main checkout; a linked worktree's git-dir is
+# <main>/.git/worktrees/<name>. Covers trunk/develop, not just main/master.
+if [[ "$git_dir" == "$common_dir" ]]; then
+  print -ru2 -- "gtrm: this is the main checkout, not a worktree — refusing"
+  return 1
+fi
+
+branch=$(git branch --show-current)
+if [[ -z "$branch" ]]; then
+  print -ru2 -- "gtrm: detached HEAD — gtr rm resolves by branch name only"
+  return 1
+fi
+
+wt=$(git rev-parse --show-toplevel)
+root=${common_dir:h}
+
+if (( ! force )); then
+  # --porcelain skips gitignored files, so node_modules and .env.local never
+  # trip this — only work that --force would actually destroy.
+  dirty=$(git status --porcelain)
+  if [[ -n "$dirty" ]]; then
+    print -ru2 -- "gtrm: refusing — \"$branch\" has uncommitted changes:"
+    print -lru2 -- ${(f)dirty}
+    print -ru2 -- "  commit or stash them, or re-run: gtrm --force"
+    return 1
+  fi
+
+  # Skipped when there is no upstream: a never-pushed branch has nothing to
+  # compare against, and firing on every local-only worktree is noise, not a guard.
+  if git rev-parse --verify --quiet '@{upstream}' >/dev/null; then
+    ahead=$(git rev-list --count '@{upstream}..HEAD')
+    if (( ahead )); then
+      print -ru2 -- "gtrm: refusing — \"$branch\" has $ahead commit(s) not on its upstream"
+      print -ru2 -- "  push them, or re-run: gtrm --force"
+      return 1
+    fi
+  fi
+fi
+
+# Close only the Space dev-init-herdr built FOR this worktree (it records
+# path -> workspace id there). If you merely cd'd here from another Space the
+# ids differ and it stays open. Read before the removal: gtr-preremove calls
+# herdr-close-worktree, which prunes that directory.
+ws_map="${XDG_STATE_HOME:-$HOME/.local/state}/dev-init/herdr-workspaces/${wt//\//%}"
+ws_id=""
+if [[ -n "${HERDR_WORKSPACE_ID-}" && -r "$ws_map" ]]; then
+  [[ "$(<"$ws_map")" == "$HERDR_WORKSPACE_ID" ]] && ws_id="$HERDR_WORKSPACE_ID"
+fi
+
+cd "$root" || return 1
+
+# --force so gitignored build output can't block `git worktree remove`; the
+# guard above already covered anything worth keeping. GTR_AUTO_DELETE_BRANCH=1
+# answers gtr-postremove's [Y/n], which has no TTY to read from here anyway.
+GTR_AUTO_DELETE_BRANCH=1 git gtr rm "$branch" --force --yes || return
+
+# Last act — this kills the pane we are in, so nothing below runs.
+# herdr-close-worktree refuses to close the Space running the command, so it
+# falls to us; `|| true` because when gtrm runs from a pane outside the Space
+# that hook closes it first and this then hits a dead id.
+if [[ -n "$ws_id" ]]; then
+  herdr workspace close "$ws_id" >/dev/null 2>&1 || true
+elif [[ -n "${HERDR_WORKSPACE_ID-}" ]]; then
+  print -ru2 -- "gtrm: this Space was not created for $wt — left it open"
+fi
+return 0

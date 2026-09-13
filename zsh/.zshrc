@@ -240,6 +240,9 @@ else
 fi
 alias zhome='for dir in ~/*/; do zoxide add "$dir"; done'
 
+fpath=("${ZDOTDIR:-$HOME}/.config/zsh/functions" $fpath)
+autoload -Uz gtrm
+
 # Name every Remote Control session after its git worktree.
 # All sessions run with remoteControlAtStartup, so each one appears in
 # claude.ai/code and the phone app. Left alone, that row gets titled from the
