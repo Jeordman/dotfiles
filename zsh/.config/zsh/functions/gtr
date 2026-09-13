@@ -1,0 +1,33 @@
+# gtr — the git-gtr binary, except that a bare `gtr rm` removes the worktree you
+# are standing in.
+#
+# `git gtr rm` with no branch is a usage error today, so nothing is taken away.
+# It can't be wired up on the `git gtr` side at all: that spelling execs the
+# git-gtr binary as a child process, and only this shell can leave the directory
+# the removal is about to delete. See the gtrm function for why that matters.
+#
+# Everything else — `gtr rm <branch>`, `gtr new`, flags, no args — goes straight
+# to the binary. Note that `which gtr` will still point at the Homebrew binary
+# while this function is what actually runs.
+#
+# Collision to know about: `git gtr init zsh` emits its own 242-line `gtr()`
+# (cached under ~/.cache/gtr/) that adds `gtr cd` with an fzf picker, `gtr new
+# --cd`, and `compdef _gtr_completion gtr`. We do not install it, so this
+# function wins. If it is ever adopted, load it FIRST and rewrite this one to
+# chain into it — otherwise whichever is defined last silently eats the other.
+
+if [[ "${1-}" != "rm" ]]; then
+  command gtr "$@"
+  return
+fi
+
+# Any non-flag argument after `rm` names a worktree, which is gtr's own job.
+local arg
+for arg in "${@[2,-1]}"; do
+  [[ "$arg" == -* ]] && continue
+  command gtr "$@"
+  return
+done
+
+shift
+gtrm "$@"

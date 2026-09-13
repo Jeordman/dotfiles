@@ -241,7 +241,7 @@ fi
 alias zhome='for dir in ~/*/; do zoxide add "$dir"; done'
 
 fpath=("${ZDOTDIR:-$HOME}/.config/zsh/functions" $fpath)
-autoload -Uz gtrm
+autoload -Uz gtrm gtr
 
 # Name every Remote Control session after its git worktree.
 # All sessions run with remoteControlAtStartup, so each one appears in
