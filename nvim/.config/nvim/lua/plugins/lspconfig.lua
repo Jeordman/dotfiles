@@ -203,8 +203,12 @@ return {
       local servers = {
         bashls = {},
         ts_ls = {
-          -- Only try to load Next.js plugin if it exists
           init_options = {
+            -- Monorepo insurance: one tsserver serves the whole workspace and sat at
+            -- ~2GB after touching two packages (node default ceiling is ~4.3GB).
+            -- When it hits the cap it dies silently and completions vanish.
+            maxTsServerMemory = 8192,
+            -- Only try to load Next.js plugin if it exists
             plugins = vim.fn.filereadable(vim.fn.getcwd() .. '/node_modules/@next/typescript-plugin/package.json') == 1 and
             {
               {

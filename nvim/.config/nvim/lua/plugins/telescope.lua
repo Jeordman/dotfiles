@@ -38,8 +38,13 @@ return { -- Fuzzy Finder (files, lsp, etc)
     -- do as well as how to actually do it!
 
     require('telescope').setup {
+      -- Monorepo note: `--no-ignore-vcs` is deliberate so gitignored .env.local
+      -- files show up (and are greppable). The cost is that every gitignored
+      -- build/cache dir would leak in too, so exclude those explicitly. rg globs
+      -- follow gitignore rules: a name with no slash matches at ANY depth
+      -- (`!node_modules`), while `!node_modules/**` only matched the repo root
+      -- and let apps/*/node_modules through.
       defaults = {
-        file_ignore_patterns = { '.git/', 'node_modules/', 'package%-lock%.json' },
         vimgrep_arguments = {
           'rg',
           '--color=never',
@@ -49,7 +54,14 @@ return { -- Fuzzy Finder (files, lsp, etc)
           '--column',
           '--smart-case',
           '--hidden',
-          '--glob=!package-lock.json',
+          '--no-ignore-vcs',
+          '--glob', '!.git',
+          '--glob', '!node_modules',
+          '--glob', '!.pnpm-store',
+          '--glob', '!{.next,.turbo,.vercel,.cache,.fallow,.playwright-mcp,.superpowers}',
+          '--glob', '!{dist,build,out,coverage,storybook-static,test-results}',
+          '--glob', '!**/tests/results',
+          '--glob', '!{*.tsbuildinfo,.DS_Store,package-lock.json,pnpm-lock.yaml}',
         },
       },
       pickers = {
@@ -59,10 +71,14 @@ return { -- Fuzzy Finder (files, lsp, etc)
             'rg',
             '--files',
             '--hidden',
-            '--no-ignore-vcs',  -- Don't respect .gitignore for version control
-            '--glob', '!node_modules/**',  -- Exclude node_modules
-            '--glob', '!.git/**',  -- Exclude .git directory
-            '--glob', '!package-lock.json',  -- Exclude package-lock.json
+            '--no-ignore-vcs', -- see note above: keeps .env.local visible
+            '--glob', '!.git',
+            '--glob', '!node_modules',
+            '--glob', '!.pnpm-store',
+            '--glob', '!{.next,.turbo,.vercel,.cache,.fallow,.playwright-mcp,.superpowers}',
+            '--glob', '!{dist,build,out,coverage,storybook-static,test-results}',
+            '--glob', '!**/tests/results',
+            '--glob', '!{*.tsbuildinfo,.DS_Store,package-lock.json}',
           },
         },
       },
