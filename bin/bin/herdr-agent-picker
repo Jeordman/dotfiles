@@ -5,15 +5,53 @@
 # Opens in vim-style NORMAL mode: j/k/g/G navigate, nothing is typed.
 # Press `/` to search (input appears), Esc returns to normal mode,
 # Esc again quits. Enter focuses the selected agent.
+#
+# Agents living in a snoozed Space are hidden — a Space you put to sleep
+# should not turn up in the jump list. ctrl-s brings them back for this
+# popup only. Snooze state is owned by the jeordin.snooze plugin.
 set -euo pipefail
 
 # Popups may launch with a minimal env; make sure the tools are findable.
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
-sel=$(
+self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+
+# snooze.py resolves its state dir from HERDR_PLUGIN_STATE_DIR when herdr
+# runs it as a plugin and from the XDG default when it is run by hand, so
+# both files exist and either can be the fresher one. Union the two rather
+# than guess which context last wrote.
+snoozed_json() {
+  local paths=(
+    "${HERDR_PLUGIN_STATE_DIR:-}/state.json"
+    "$HOME/.local/state/herdr/plugins/jeordin.snooze/state.json"
+    "$HOME/.local/state/herdr-snooze/state.json"
+  )
+  local now
+  now=$(date +%s)
+
+  {
+    local p
+    for p in "${paths[@]}"; do
+      [ -f "$p" ] || continue
+      # `until` is epoch seconds. Expired entries normally vanish when the
+      # ticker wakes them, but a dead ticker would otherwise hide a Space
+      # forever — so drop them here too.
+      jq -r --argjson now "$now" \
+        '(.snoozes // {}) | to_entries[] | select(.value.until > $now) | .key' \
+        "$p" 2>/dev/null || true
+    done
+  } | sort -u | jq -R . | jq -s .
+}
+
+build_rows() {
+  local mode="${1:-hide}"
+  local snoozed='[]'
+  [ "$mode" = "hide" ] && snoozed="$(snoozed_json)"
+
   herdr agent list \
-    | jq -r --arg home "$HOME" '
+    | jq -r --arg home "$HOME" --argjson snoozed "$snoozed" '
         .result.agents[]
+        | select((.workspace_id // "") as $w | ($snoozed | index($w)) | not)
         | [ (if .focused then "●" else "○" end),
             .agent_status,
             .terminal_title_stripped,
@@ -55,16 +93,39 @@ sel=$(
             tc = (sc == DIM) ? DIM : FG        # whole row recedes when nothing is wanted
             printf fmt, sc, icon[i], st[i], tc, t, cwd[i], pid[i]
           }
-        }' \
+        }'
+}
+
+# fzf's reload() re-runs this script for its rows, so the toggle costs one
+# entry point rather than a second copy of the pipeline.
+if [ "${1:-}" = "--rows" ]; then
+  build_rows "${2:-hide}"
+  exit 0
+fi
+
+# A count is decoration; never let it take the picker down with it.
+total=$(herdr agent list 2>/dev/null | jq '.result.agents | length' 2>/dev/null || echo 0)
+shown=$(build_rows hide | grep -c '' || true)
+hidden=$(( total - shown ))
+[ "$hidden" -lt 0 ] && hidden=0
+
+base='NORMAL — j/k move · g/G top/bottom · / search · enter focus · esc quit'
+header="$base"
+[ "$hidden" -gt 0 ] && header="$base"$'\n'"$hidden in snoozed Spaces — ctrl-s to show"
+
+sel=$(
+  build_rows hide \
     | fzf --ansi \
           --delimiter='\t' \
           --with-nth=1 \
           --reverse \
-          --header='NORMAL — j/k move · g/G top/bottom · / search · enter focus · esc quit' \
+          --header="$header" \
+          --header-lines=0 \
           --bind 'start:hide-input+disable-search' \
           --bind 'j:down,k:up' \
           --bind 'g:first,G:last' \
           --bind 'ctrl-d:half-page-down,ctrl-u:half-page-up' \
+          --bind "ctrl-s:reload($self --rows all)+change-header($base"$'\n'"showing snoozed Spaces)" \
           --bind '/:unbind(j,k,g,G,/)+show-input+enable-search' \
           --bind 'esc:transform:[ "$FZF_INPUT_STATE" = enabled ] && echo "disable-search+hide-input+clear-query+rebind(j,k,g,G,/)" || echo "abort"' \
           --bind 'enter:accept'
