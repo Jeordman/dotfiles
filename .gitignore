@@ -8,3 +8,8 @@ __pycache__/
 # desktop's skill toggles or ~/.superset/disabled-skills.json, never by editing
 # files here.
 claude/.claude/skills/superset/
+
+# Claude Code's synced skills cache (pulled from the claude.ai account, keyed by
+# account+org UUID). Claude Code rewrites it on sync, and ~/.claude/skills is a
+# symlink into this repo, so it lands here uninvited. Nothing here is authored.
+claude/.claude/skills/synced/

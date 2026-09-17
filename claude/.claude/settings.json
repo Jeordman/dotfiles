@@ -113,7 +113,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "claude-fable-5-1[1m]",
+  "model": "opus[1m]",
   "enableAllProjectMcpServers": true,
   "hooks": {
     "SessionStart": [
@@ -261,7 +261,7 @@
       "effortLevel": "low"
     },
     "claude-fable-5-1": {
-      "effortLevel": "low"
+      "effortLevel": "medium"
     }
   },
   "tui": "fullscreen",
