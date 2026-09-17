@@ -1,0 +1,43 @@
+id = "jeordin.snooze"
+name = "Snooze"
+version = "0.1.0"
+min_herdr_version = "0.9.1"
+description = "Snooze a Space: sink it to the bottom of the sidebar with a countdown, then wake it with an alert"
+platforms = ["macos", "linux"]
+
+# Re-sync ordering and countdowns after a Herdr restart, and restart the
+# ticker if anything is still snoozed. Returns immediately.
+[[startup]]
+command = ["python3", "snooze.py", "ensure-daemon"]
+
+[[actions]]
+id = "snooze-picker"
+title = "Snooze this Space"
+contexts = ["workspace"]
+command = ["python3", "snooze.py", "open-picker"]
+
+[[actions]]
+id = "wake"
+title = "Wake this Space now"
+contexts = ["workspace"]
+command = ["python3", "snooze.py", "wake-current"]
+
+[[actions]]
+id = "wake-all"
+title = "Wake all snoozed Spaces"
+contexts = ["workspace"]
+command = ["python3", "snooze.py", "wake-all"]
+
+[[actions]]
+id = "tick"
+title = "Refresh snooze countdowns"
+contexts = ["workspace"]
+command = ["python3", "snooze.py", "tick"]
+
+[[panes]]
+id = "picker"
+title = "Snooze for how long?"
+placement = "popup"
+width = "50%"
+height = 16
+command = ["bash", "picker.sh"]

@@ -89,9 +89,34 @@ enabled = true
 # hue on the wheel, so it argued against the warning this rule exists to give;
 # and #CCA694 (Conductor's --status-done), warm but at C 0.052 too quiet to
 # register as a caution at a glance.
+#
+# $snooze is reported by the herdr-snooze plugin (dotfiles/herdr-snooze, linked
+# with `herdr plugin link`, not stowed). It renders "💤 2h" on a snoozed Space
+# and is absent otherwise. fujiGray + dim on purpose: a snoozed Space is one
+# you deliberately pushed away, so it should recede below the live rows rather
+# than compete with them.
 rows = [
-  ["state_icon", "workspace"],
-  [{ token = "branch", fg = "#8A8A8A", dim = false, rules = [
+  # A snoozed Space is renamed with a 💤 prefix by the herdr-snooze plugin.
+  # The rename is the whole mechanism: value rules match a token against its
+  # own value, so there is no way to dim `workspace` from separate snooze
+  # metadata. The prefix has to be in the name for this rule to see it, and
+  # it must stay in step with BADGE in snooze.py.
+  ["state_icon", { token = "workspace", rules = [
+     { starts_with = "💤 ", fg = "#54546D", dim = true },
+   ] }, { token = "$snooze", fg = "#54546D", dim = true }],
+  # $branch_ is the plugin's copy of the branch name, not the built-in token.
+  # Same reason as the workspace row above: a rule only sees its own token's
+  # value, so fading a snoozed Space's branch needs the plugin to own it and
+  # prefix it. git_status stays built-in and keeps its green/red counts.
+  #
+  # Cost of this: if the snooze ticker dies, branch names fade from the whole
+  # sidebar once the 24h token TTL lapses. Swap back to "branch" to undo.
+  # The first rule matches a zero-width space (U+200B) that the plugin puts in
+  # front of a snoozed Space's branch. Invisible on purpose: the 💤 is already
+  # on the name row and repeating it here read as clutter. It must come first,
+  # so a snoozed `main` fades instead of taking the caution colour below.
+  [{ token = "$branch_", fg = "#8A8A8A", dim = false, rules = [
+     { starts_with = "​", fg = "#54546D", dim = true },
      { equals = "main",   fg = "#E6C384" },
      { equals = "master", fg = "#E6C384" },
    ] }, "git_status"],
@@ -135,6 +160,11 @@ last_pane = "prefix+semicolon"           # tmux: bind ';' last-pane
 move_tab_previous = "prefix+shift+comma" # tmux: bind '<' swap-window -t -1
 move_tab_next = "prefix+shift+period"    # tmux: bind '>' swap-window -t +1
 
+# Moved off prefix+z (herdr's default), which is now snooze — see the
+# [[keys.command]] block below. tmux zoom is prefix+z too, so this one costs
+# some muscle memory; shift+z keeps it on the same letter.
+zoom = "prefix+shift+z"
+
 # Navigate-mode (goto, prefix+w): vim j/k walk the spaces list instead of arrows.
 # This takes j/k off pane up/down, so arrows drive pane vertical (arrows already
 # do pane left/right). Net: j/k = spaces, arrows = panes.
@@ -154,6 +184,22 @@ description = "Agents"          # shown as the popup border label (was "popup")
 command = "herdr-agent-picker"
 width = "70%"
 height = "60%"
+
+# prefix+z -> snooze the current Space: it sinks to the bottom of the sidebar
+# with a countdown, then comes back with an alert when the timer ends.
+# Provided by the herdr-snooze plugin; the binding is inert without it, so this
+# stays safe on a machine where the plugin was never linked.
+#
+# zzz for sleep. `s` was unavailable in every form: prefix+s is workspace_picker
+# and prefix+shift+s is settings.
+#
+# This takes prefix+z off zoom, which is herdr's default for it. Zoom moved to
+# prefix+shift+z below rather than being lost.
+[[keys.command]]
+key = "prefix+z"
+type = "plugin_action"
+command = "jeordin.snooze.snooze-picker"
+description = "Snooze"
 
 [session]
 # After a server restart (reboot, `herdr server stop`, `herdr update`), reattach
