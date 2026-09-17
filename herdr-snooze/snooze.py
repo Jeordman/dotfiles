@@ -52,10 +52,38 @@ def server_key():
 
 
 def state_dir():
+    """One directory, whoever launched us.
+
+    Herdr sets HERDR_PLUGIN_STATE_DIR when it runs the plugin; a shell does
+    not. Falling back to a different path split everything in two: two state
+    files, two locks, and two tickers that could not see each other, so a
+    snooze set from the picker and one set from the CLI lived in separate
+    worlds. The fallback now names the same directory herdr would have.
+    """
     d = os.environ.get("HERDR_PLUGIN_STATE_DIR") or os.path.expanduser(
-        "~/.local/state/herdr-snooze"
+        f"~/.local/state/herdr/plugins/{SOURCE}"
     )
     os.makedirs(d, exist_ok=True)
+
+    # Adopt anything the old split-brain fallback left behind.
+    legacy_dir = os.path.expanduser("~/.local/state/herdr-snooze")
+    if os.path.isdir(legacy_dir) and os.path.realpath(legacy_dir) != os.path.realpath(d):
+        for name in os.listdir(legacy_dir):
+            src, dst = os.path.join(legacy_dir, name), os.path.join(d, name)
+            if name.endswith(".json"):
+                # Adopt it only if this side has nothing; never overwrite the
+                # herdr-launched copy, which is the one the picker wrote to.
+                # A loser is left in place rather than deleted.
+                if not os.path.exists(dst):
+                    try:
+                        os.rename(src, dst)
+                    except OSError:
+                        pass
+                continue
+            try:
+                os.remove(src)  # stale locks and pidfiles, never merged
+            except OSError:
+                pass
     return d
 
 
