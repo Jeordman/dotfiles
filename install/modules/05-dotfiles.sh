@@ -275,6 +275,49 @@ refresh_herdr_skill() {
 
 refresh_herdr_skill
 
+# Link the local herdr plugins. Stow cannot do this: a plugin is registered with
+# the herdr server by path, not linked into ~/.config, so a stowed copy would sit
+# on disk unregistered and every plugin action would resolve to nothing.
+#
+# That silence is the whole reason this exists. config.toml moves new_workspace
+# off prefix+shift+n so the snooze plugin can place a new Space above the
+# sleeping ones, which means an unlinked plugin does not degrade to herdr's
+# built-in — it leaves prefix+shift+n dead. Same for prefix+z. Plugin actions
+# and popup commands also run on the herdr SERVER, so attaching a remote machine
+# needs the plugin linked over there, not on the client.
+#
+# `plugin link` is idempotent, so this re-runs safely.
+link_herdr_plugins() {
+    local plugin_dirs=("$DOTFILES_DIR/herdr-snooze")
+
+    if ! command -v herdr >/dev/null 2>&1; then
+        log_info "herdr not installed — skipping plugin link"
+        return 0
+    fi
+
+    local dir
+    for dir in "${plugin_dirs[@]}"; do
+        [ -f "$dir/herdr-plugin.toml" ] || {
+            log_warning "no herdr-plugin.toml in $dir — skipping"
+            continue
+        }
+
+        if [[ "$DRY_RUN" == "true" ]]; then
+            log_info "[DRY RUN] Would link herdr plugin $(basename "$dir")"
+            continue
+        fi
+
+        if herdr plugin link "$dir" >/dev/null 2>&1; then
+            log_success "herdr plugin linked: $(basename "$dir")"
+        else
+            # Not fatal: herdr may simply not be running yet on a fresh box.
+            log_warning "could not link herdr plugin $(basename "$dir") — run: herdr plugin link $dir"
+        fi
+    done
+}
+
+link_herdr_plugins
+
 # Share curated Claude config with the per-directory "personal" account.
 # ~/.claude-personal is the config dir used when CLAUDE_CONFIG_DIR points at it
 # (see ~/personal/.envrc and docs/direnv.md). It reuses the SAME dotfiles sources

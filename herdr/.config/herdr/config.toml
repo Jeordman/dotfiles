@@ -173,6 +173,13 @@ move_tab_next = "prefix+shift+period"    # tmux: bind '>' swap-window -t +1
 # some muscle memory; shift+z keeps it on the same letter.
 zoom = "prefix+shift+z"
 
+# Moved off prefix+shift+n (herdr's default), which is now the snooze plugin's
+# new-space action — see the [[keys.command]] block below. A [[keys.command]]
+# does NOT override a built-in on the same key, the built-in just keeps winning,
+# so this line is what actually frees it. Kept bound rather than unset so there
+# is still a way to make a Space if the plugin ever stops loading.
+new_workspace = "prefix+alt+n"
+
 # Navigate-mode (goto, prefix+w): vim j/k walk the spaces list instead of arrows.
 # This takes j/k off pane up/down, so arrows drive pane vertical (arrows already
 # do pane left/right). Net: j/k = spaces, arrows = panes.
@@ -208,6 +215,20 @@ key = "prefix+z"
 type = "plugin_action"
 command = "jeordin.snooze.snooze-picker"
 description = "Snooze"
+
+# prefix+shift+n -> new Space, placed above the snoozed block instead of
+# appended below it. herdr's built-in new_workspace appends to the end of the
+# sidebar, which is exactly where sleeping Spaces sit, so a new Space landed
+# under them and then visibly jumped when the plugin's next tick lifted it.
+# This does the create and the placement in one action.
+#
+# Unlike prefix+z, an inert binding here would cost the new-Space key itself,
+# so drop this block on a machine where herdr-snooze is not linked.
+[[keys.command]]
+key = "prefix+shift+n"
+type = "plugin_action"
+command = "jeordin.snooze.new-space"
+description = "New Space"
 
 [session]
 # After a server restart (reboot, `herdr server stop`, `herdr update`), reattach

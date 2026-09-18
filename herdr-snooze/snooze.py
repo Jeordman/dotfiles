@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import re
+import select
 import socket
 import subprocess
 import sys
@@ -499,6 +500,16 @@ def cmd_wake(ws_id, alert=False):
 def cmd_tick():
     """Wake anything due, refresh the countdown on everything else."""
     state = load_state()
+    # Ordering first, decoration second. A new Space is appended below the
+    # sunk block and this tick is what lifts it back above them, so every
+    # call ahead of the move is a frame of visibly wrong order on screen.
+    # refresh_branches alone forks a git process per Space.
+    if state["snoozes"]:
+        try:
+            sink_snoozed(state)
+        except RuntimeError as e:
+            print(f"early sink failed: {e}", file=sys.stderr)
+
     # Branch tokens are owned by this plugin for every Space, so they are
     # refreshed even when nothing is asleep.
     try:
@@ -581,6 +592,131 @@ def daemon_running():
     return pid != os.getpid()
 
 
+# ------------------------------------------------------------------- events
+
+# Herdr appends a new Space to the end of the sidebar, which is underneath the
+# snoozed block, and a Space has no branch name until this plugin reports one.
+# Only a tick fixes either, so on a flat interval a brand new Space sat among
+# the sleepers wearing no branch for up to a minute. Subscribing to the socket
+# lets that tick run as soon as the Space exists instead.
+EVENT_SUBSCRIPTIONS = [{"type": "workspace.created"}, {"type": "pane.created"}]
+
+# workspace.created fires before the Space's first pane is wired up, and the
+# branch name comes from that pane's cwd, so reacting the instant the event
+# lands reports no branch at all. pane.created covers the gap, and settling
+# briefly folds the burst of both into a single tick.
+EVENT_SETTLE_SECONDS = 0.5
+
+
+class EventStream:
+    """A sleep that ends early when herdr says a Space or pane appeared.
+
+    `events.wait` looks like the obvious fit and is not: it answers
+    `unsupported_event_wait_match` for anything but pane agent status. Only
+    `events.subscribe` carries workspace events, and it streams them down the
+    connection that asked for them, so the socket has to stay open across naps.
+
+    Every failure path falls back to sleeping out the rest of the nap, which is
+    the old behaviour exactly, so a server that is down, restarting, or too old
+    to know the method costs responsiveness and nothing else.
+    """
+
+    def __init__(self):
+        self.sock = None
+        self.buf = b""
+
+    def _connect(self):
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(5)
+        try:
+            s.connect(sock_path())
+            req = {
+                "jsonrpc": "2.0",
+                "id": "snooze-events",
+                "method": "events.subscribe",
+                "params": {"subscriptions": EVENT_SUBSCRIPTIONS},
+            }
+            s.sendall((json.dumps(req) + "\n").encode())
+        except (OSError, socket.timeout):
+            s.close()
+            return False
+        s.setblocking(False)
+        self.sock, self.buf = s, b""
+        return True
+
+    def close(self):
+        if self.sock is not None:
+            try:
+                self.sock.close()
+            except OSError:
+                pass
+        self.sock = None
+
+    def _read(self):
+        """Drain what is pending. Returns (still connected, saw an event).
+
+        The payload is thrown away: the tick that follows reads live state
+        anyway, so all this needs to know is that something changed. The
+        subscription acknowledgement carries no `event` key, which is what
+        stops a reconnect from counting as a change.
+        """
+        saw = False
+        while True:
+            try:
+                chunk = self.sock.recv(65536)
+            except BlockingIOError:
+                break
+            except OSError:
+                return False, saw
+            if not chunk:
+                return False, saw
+            self.buf += chunk
+        while b"\n" in self.buf:
+            line, self.buf = self.buf.split(b"\n", 1)
+            if not line.strip():
+                continue
+            try:
+                msg = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if msg.get("event"):
+                saw = True
+        return True, saw
+
+    def wait(self, seconds):
+        deadline = time.time() + seconds
+        if self.sock is None and not self._connect():
+            time.sleep(seconds)
+            return
+
+        def sleep_out():
+            time.sleep(max(0, deadline - time.time()))
+
+        while True:
+            left = deadline - time.time()
+            if left <= 0:
+                return
+            try:
+                ready, _, _ = select.select([self.sock], [], [], left)
+            except (OSError, ValueError):
+                self.close()
+                sleep_out()
+                return
+            if not ready:
+                return
+            alive, saw_event = self._read()
+            if not alive:
+                # Herdr went away or restarted. Sleeping out the nap rather
+                # than returning keeps a dead socket from spinning the ticker.
+                self.close()
+                sleep_out()
+                return
+            if saw_event:
+                time.sleep(EVENT_SETTLE_SECONDS)
+                self._read()
+                return
+
+
 def cmd_daemon():
     """Tick forever. This used to exit once nothing was snoozed, which is no
     longer safe: branch names in the sidebar are plugin-reported for every
@@ -598,6 +734,7 @@ def cmd_daemon():
 
     with open(pid_path(), "w") as f:
         f.write(str(os.getpid()))
+    events = EventStream()
     try:
         while True:
             try:
@@ -606,11 +743,13 @@ def cmd_daemon():
                 print(f"tick failed: {e}", file=sys.stderr)
             # Sleep to the next wake rather than a flat interval, or a snooze
             # set just after a tick fires up to a whole interval late. Still
-            # capped so countdowns keep refreshing while nothing is due.
+            # capped so countdowns keep refreshing while nothing is due, and
+            # cut short when a new Space or pane turns up.
             due = [e["until"] for e in load_state()["snoozes"].values()]
             nap = min(TICK_SECONDS, *(d - time.time() for d in due)) if due else TICK_SECONDS
-            time.sleep(max(1, min(TICK_SECONDS, nap)))
+            events.wait(max(1, min(TICK_SECONDS, nap)))
     finally:
+        events.close()
         try:
             os.unlink(pid_path())
         except OSError:
@@ -641,6 +780,24 @@ def current_workspace():
     if not focused:
         sys.exit("no focused Space and HERDR_WORKSPACE_ID is unset")
     return focused["workspace_id"]
+
+
+def cmd_new_space():
+    """Create a Space and put it above the sleeping ones in the same breath.
+
+    herdr appends a new Space to the end of the sidebar, which is where the
+    snoozed block lives, so it lands under Spaces the user has explicitly put
+    away. The daemon does correct it, but only after its event round-trip and
+    a full tick, which reads as the new Space visibly jumping. Doing both
+    halves here means the position is already right the first time it paints.
+
+    Nothing about this needs the new id: sinking the sleepers past it lifts it
+    just as well, and re-sinking is what keeps the block ordered anyway.
+    """
+    rpc("workspace.create", {"focus": True})
+    state = load_state()
+    if state["snoozes"]:
+        sink_snoozed(state)
 
 
 def cmd_open_picker():
@@ -720,6 +877,8 @@ def main():
         cmd_list()
     elif cmd == "open-picker":
         cmd_open_picker()
+    elif cmd == "new-space":
+        cmd_new_space()
     else:
         sys.exit(f"unknown command: {cmd}")
 

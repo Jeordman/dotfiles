@@ -16,6 +16,15 @@ title = "Snooze this Space"
 contexts = ["workspace"]
 command = ["python3", "snooze.py", "open-picker"]
 
+# Bound over herdr's own new_workspace so a new Space is placed above the
+# sleeping block as it is created, rather than landing under it and being
+# lifted a tick later.
+[[actions]]
+id = "new-space"
+title = "New Space (above snoozed)"
+contexts = ["workspace"]
+command = ["python3", "snooze.py", "new-space"]
+
 [[actions]]
 id = "wake"
 title = "Wake this Space now"
