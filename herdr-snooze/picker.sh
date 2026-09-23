@@ -14,6 +14,11 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Exported for the header preview below, which fzf runs in its own shell on
+# every keystroke and so cannot see this script's variables.
+export SNOOZE_PY="$here/snooze.py"
+export SNOOZE_HELP='type any duration: 45m · 2h · 3d · 1w · 9am · thu 9am'
+
 # Handed over by cmd_open_picker: a popup is a session singleton with no
 # workspace context of its own, so it cannot work these out for itself.
 ws="${HERDR_SNOOZE_WS:-}"
@@ -59,7 +64,8 @@ out=$(
           --delimiter='\t' --with-nth=2 \
           --height=100% --layout=reverse --info=inline \
           --prompt="${current:+[asleep, $current left] }snooze $label for " \
-          --header='type any duration: 45m · 2h · 3d · 1w · 9am · thu 9am' \
+          --header="$SNOOZE_HELP" \
+          --bind='start,change,focus:transform-header(printf "%s\n" "$SNOOZE_HELP"; python3 "$SNOOZE_PY" when {q} {1})' \
           --pointer='▸' \
           --bind='esc:abort' \
           --no-mouse

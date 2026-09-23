@@ -259,6 +259,37 @@ def humanize(until, now=None):
     return f"{max(1, round(left / 86400))}d"
 
 
+def span(seconds):
+    """Relative length for the picker preview: 45m, 5h 30m, 1d 5h."""
+    minutes = max(1, round(seconds / 60))
+    days, rem = divmod(minutes, 1440)
+    hours, mins = divmod(rem, 60)
+    if days:
+        return f"{days}d {hours}h" if hours else f"{days}d"
+    if hours:
+        return f"{hours}h {mins}m" if mins else f"{hours}h"
+    return f"{mins}m"
+
+
+def describe_when(until, now=None):
+    """Absolute wake time for the picker preview: "tomorrow 8:47pm (in 1d 5h)".
+
+    The sidebar countdown is deliberately coarse; this is the one place the
+    exact minute matters, because it answers "when is 29h, actually?".
+    """
+    now = now or datetime.now()
+    at = datetime.fromtimestamp(until)
+    days = (at.date() - now.date()).days
+    if days == 0:
+        day = "today"
+    elif days == 1:
+        day = "tomorrow"
+    else:
+        day = at.strftime("%a %b %-d")
+    clock = at.strftime("%-I:%M%p").lower()
+    return f"{day} {clock}  (in {span(until - now.timestamp())})"
+
+
 # ------------------------------------------------------------------ sidebar
 
 def set_token(ws_id, text):
@@ -873,6 +904,21 @@ def main():
             parse_when(args[1])
         except (ValueError, IndexError):
             sys.exit(1)
+    elif cmd == "when":
+        # Live preview for the picker header, run on every keystroke. Mirrors
+        # the picker's own choice: a valid typed query wins, else the row
+        # under the cursor. Prints nothing when neither would snooze.
+        query = args[1].strip() if len(args) > 1 else ""
+        row = args[2].strip() if len(args) > 2 else ""
+        for spec in (query, row):
+            if spec == "wake":
+                print("wakes now")
+                return
+            try:
+                print(f"wakes {describe_when(parse_when(spec))}")
+                return
+            except ValueError:
+                continue
     elif cmd == "list":
         cmd_list()
     elif cmd == "open-picker":

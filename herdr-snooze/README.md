@@ -84,6 +84,11 @@ duration wins over it. fzf runs with `--exact` and the typed query is
 validated first, because fuzzy matching turned `1m` into the `15m` row and
 silently snoozed for the wrong length.
 
+The header's second line shows the exact wake time as you type ("wakes
+tomorrow 8:59pm (in 1d 5h)"), for the typed entry or the highlighted row by
+the same rule. It comes from `snooze.py when`, which uses the same parser as
+the snooze itself, so the preview and the result cannot disagree.
+
 Durations: `45m`, `2h`, `3d`, `1w`, and compounds like `2h30m`. Clock times:
 `9am`, `14:30`. Days: `tomorrow 9am`, `mon`, `thu 5pm`. Bare times and
 weekdays resolve to the next future occurrence; a bare weekday defaults to 9am.
