@@ -4,9 +4,14 @@
 #
 # The list is a shortcut, not a menu: anything you type that fzf does not
 # match is taken as the duration itself, so "1m", "90m" or "thu 9am" work
-# without being on it. That is why this does not use the vim NORMAL-mode
-# bindings herdr-agent-picker has — j/k have to type here, not navigate.
-# Arrows and ctrl-n/ctrl-p move; Esc aborts.
+# without being on it. That is why this has no NORMAL mode like
+# herdr-agent-picker: typing has to work from the first keystroke.
+#
+# j/k still move, with no mode switch, because no valid entry contains either
+# letter: units are m/h/d/w, clock times am/pm, days "tomorrow" and mon..sun
+# (spelled out too: "wednesday", "thursday"). If the parser ever learns a word
+# with a j or k in it, this binding has to go. Arrows and ctrl-n/ctrl-p also
+# move; Esc aborts.
 set -euo pipefail
 
 # Popups may launch with a minimal env; make sure the tools are findable.
@@ -17,7 +22,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Exported for the header preview below, which fzf runs in its own shell on
 # every keystroke and so cannot see this script's variables.
 export SNOOZE_PY="$here/snooze.py"
-export SNOOZE_HELP='type any duration: 45m · 2h · 3d · 1w · 9am · thu 9am'
+export SNOOZE_HELP='45m · 2h · 3d · 1w · 9am · thu 9am'
 
 # Handed over by cmd_open_picker: a popup is a session singleton with no
 # workspace context of its own, so it cannot work these out for itself.
@@ -38,36 +43,30 @@ while true; do
 # fzf exits non-zero when the query matches nothing, but --print-query still
 # emits the query, which is exactly the free-form case. Esc gives an empty
 # query and no selection, which is how abort is told apart from it.
+#
+# Colours are the herdr theme tokens from config.toml, so the popup's chrome
+# stays neutral like the rest of herdr instead of fzf's blue prompt and pink
+# pointer: text #EDEDED, subtext0 #909090, overlay0 #5A5A5A, surface1
+# #262626, selection_bg #2E2E2E, accent #E8E8E8. The rows keep their own
+# ANSI colours from `snooze.py rows`.
+#
+# Rows are spec<TAB>spec<TAB>time. --with-nth=2.. hides the raw spec and
+# --nth=1 searches only the spec column of what is shown; --tabstop=1 turns
+# the tab between the two display columns into a single space.
 out=$(
-  {
-    # Waking leads when the Space is already asleep, so prefix+z cancels as
-    # easily as it snoozes.
-    [ -n "$current" ] && printf 'wake\tWake now (%s left)\n' "$current"
-    printf '15m\t15 minutes\n'
-    printf '30m\t30 minutes\n'
-    printf '1h\t1 hour\n'
-    printf '2h\t2 hours\n'
-    printf '4h\t4 hours\n'
-    printf 'tomorrow 9am\ttomorrow morning\n'
-    printf 'mon 9am\tMonday morning\n'
-    printf '3d\t3 days\n'
-    printf '1w\t1 week\n'
-  } | awk -F'\t' '
-      BEGIN {
-        E   = "\033[0m"
-        DIM = "\033[38;2;114;113;105m"   # fujiGray
-        FG  = "\033[38;2;220;215;186m"   # fujiWhite
-      }
-      { printf "%s\t%s%-14s%s %s%s%s\n", $1, FG, $1, E, DIM, $2, E }
-    ' \
+  python3 "$SNOOZE_PY" rows "$current" \
     | fzf --ansi --print-query --exact \
-          --delimiter='\t' --with-nth=2 \
-          --height=100% --layout=reverse --info=inline \
+          --delimiter='\t' --with-nth=2.. --nth=1 --tabstop=1 \
+          --height=100% --layout=reverse --info=inline-right --no-separator \
           --prompt="${current:+[asleep, $current left] }snooze $label for " \
-          --header="$SNOOZE_HELP" \
-          --bind='start,change,focus:transform-header(printf "%s\n" "$SNOOZE_HELP"; python3 "$SNOOZE_PY" when {q} {1})' \
-          --pointer='▸' \
+          --ghost="$SNOOZE_HELP" \
+          --bind='start,change,focus:transform-header(python3 "$SNOOZE_PY" when {q} {1})' \
+          --pointer='▸' --gutter=' ' \
+          --color='fg:#909090,fg+:#EDEDED,bg+:#2E2E2E,hl:#EDEDED:bold,hl+:#EDEDED:bold' \
+          --color='prompt:#909090,query:#EDEDED:bold,pointer:#E8E8E8,info:#5A5A5A' \
+          --color='header:#5A5A5A,ghost:#5A5A5A,border:#262626,scrollbar:#262626' \
           --bind='esc:abort' \
+          --bind='j:down,k:up' \
           --no-mouse
 ) || true
 

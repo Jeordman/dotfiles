@@ -84,10 +84,20 @@ duration wins over it. fzf runs with `--exact` and the typed query is
 validated first, because fuzzy matching turned `1m` into the `15m` row and
 silently snoozed for the wrong length.
 
-The header's second line shows the exact wake time as you type ("wakes
-tomorrow 8:59pm (in 1d 5h)"), for the typed entry or the highlighted row by
-the same rule. It comes from `snooze.py when`, which uses the same parser as
-the snooze itself, so the preview and the result cannot disagree.
+j/k move through the list while you type, with no mode switch, because no
+valid entry contains either letter. If the parser ever accepts a word with a j
+or k in it, that binding in `picker.sh` has to go.
+
+The header shows the exact wake time as you type ("wakes tomorrow 8:59pm
+(in 1d 5h)"), for the typed entry or the highlighted row by the same rule, and
+each row shows its own wake time beside it. Both come from `snooze.py when`
+and `snooze.py rows`, which use the same parser as the snooze itself, so the
+preview and the result cannot disagree. Search matches the duration column
+only, so typing `9` finds the 9am rows rather than every time with a 9 in it.
+
+The popup's colours are the herdr theme tokens from `config.toml` (neutral
+greys, white accent), not fzf's defaults; the rows keep the Kanagawa
+fujiWhite/fujiGray pair that `herdr-agent-picker` also uses.
 
 Durations: `45m`, `2h`, `3d`, `1w`, and compounds like `2h30m`. Clock times:
 `9am`, `14:30`. Days: `tomorrow 9am`, `mon`, `thu 5pm`. Bare times and

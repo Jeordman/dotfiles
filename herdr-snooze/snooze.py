@@ -271,23 +271,76 @@ def span(seconds):
     return f"{mins}m"
 
 
-def describe_when(until, now=None):
-    """Absolute wake time for the picker preview: "tomorrow 8:47pm (in 1d 5h)".
+def wake_at(until, now=None, today="today"):
+    """Absolute wake time: "today 8:47pm", "tomorrow 9:00am", "Fri Sep 25 5:17pm".
 
-    The sidebar countdown is deliberately coarse; this is the one place the
-    exact minute matters, because it answers "when is 29h, actually?".
+    The sidebar countdown is deliberately coarse; the picker is the one place
+    the exact minute matters, because it answers "when is 29h, actually?".
     """
     now = now or datetime.now()
     at = datetime.fromtimestamp(until)
     days = (at.date() - now.date()).days
-    if days == 0:
-        day = "today"
-    elif days == 1:
-        day = "tomorrow"
-    else:
-        day = at.strftime("%a %b %-d")
     clock = at.strftime("%-I:%M%p").lower()
-    return f"{day} {clock}  (in {span(until - now.timestamp())})"
+    if days == 0:
+        return f"{today} {clock}".strip()
+    if days == 1:
+        return f"tomorrow {clock}"
+    return f"{at.strftime('%a %b %-d')} {clock}"
+
+
+# Picker colours. Truecolor escapes because fzf passes them through with
+# --ansi. FG/DIM are the Kanagawa pair herdr-agent-picker also uses for its
+# rows, so the two popups read as siblings; BRIGHT/MUTED are the theme's
+# neutral text and overlay1 from config.toml, for the header line.
+E = "\033[0m"
+FG = "\033[38;2;220;215;186m"      # fujiWhite
+DIM = "\033[38;2;114;113;105m"     # fujiGray
+BRIGHT = "\033[1;38;2;237;237;237m"  # theme text #EDEDED, bold
+MUTED = "\033[38;2;118;118;118m"   # theme overlay1 #767676
+
+# The picker's shortcut rows. Each one shows its real wake time beside it,
+# since "15 minutes" next to "15m" only said the same thing twice.
+PICKER_ROWS = ["15m", "30m", "1h", "2h", "4h", "tomorrow 9am", "mon 9am",
+               "3d", "1w"]
+
+
+def cmd_rows(current=""):
+    """Rows for picker.sh: spec<TAB>display spec<TAB>display wake time.
+
+    The spec gets its own field so fzf can search it alone (--nth=1);
+    otherwise typing "9" would also match every row whose time has a 9.
+    """
+    rows = []
+    if current:
+        # Waking leads when the Space is already asleep, so prefix+z cancels
+        # as easily as it snoozes.
+        rows.append(("wake", f"now, {current} left"))
+    now = datetime.now()
+    for spec in PICKER_ROWS:
+        rows.append((spec, wake_at(parse_when(spec, now), now, today="")))
+    for spec, when in rows:
+        print(f"{spec}\t{FG}{spec:<14}{E}\t{DIM}{when}{E}")
+
+
+def cmd_when(query, row):
+    """Header line for picker.sh, run on every keystroke.
+
+    Mirrors the picker's own choice: a valid typed query wins, else the row
+    under the cursor. Always prints a line, so the list below does not jump
+    as the header appears and disappears.
+    """
+    for spec in (query.strip(), row.strip()):
+        if spec == "wake":
+            print(f"{MUTED}wakes{E} {BRIGHT}now{E}")
+            return
+        try:
+            until = parse_when(spec)
+        except ValueError:
+            continue
+        left = span(until - time.time())
+        print(f"{MUTED}wakes{E} {BRIGHT}{wake_at(until)}{E} {MUTED}(in {left}){E}")
+        return
+    print(f"{MUTED}not a duration yet{E}")
 
 
 # ------------------------------------------------------------------ sidebar
@@ -905,20 +958,9 @@ def main():
         except (ValueError, IndexError):
             sys.exit(1)
     elif cmd == "when":
-        # Live preview for the picker header, run on every keystroke. Mirrors
-        # the picker's own choice: a valid typed query wins, else the row
-        # under the cursor. Prints nothing when neither would snooze.
-        query = args[1].strip() if len(args) > 1 else ""
-        row = args[2].strip() if len(args) > 2 else ""
-        for spec in (query, row):
-            if spec == "wake":
-                print("wakes now")
-                return
-            try:
-                print(f"wakes {describe_when(parse_when(spec))}")
-                return
-            except ValueError:
-                continue
+        cmd_when(args[1] if len(args) > 1 else "", args[2] if len(args) > 2 else "")
+    elif cmd == "rows":
+        cmd_rows(args[1] if len(args) > 1 else "")
     elif cmd == "list":
         cmd_list()
     elif cmd == "open-picker":
