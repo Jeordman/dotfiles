@@ -96,11 +96,10 @@ resolve_stow_conflicts() {
 # claude/.claude/skills/. Stow never sees vendor/ (not a STOW_PACKAGE), but the
 # symlinks dangle until the submodules are checked out, so do it before stowing.
 # sparse-checkout keeps only the skill directories we actually symlink on disk
-# instead of each project's full source. What to keep differs per upstream: tuicr
-# publishes skills/ at its root, while cursor/plugins is a 40-skill monorepo we
-# want exactly two directories out of. So each submodule lists its own sparsePath
-# entries in .gitmodules (repeat the key to keep more than one) and the loop reads
-# them, rather than assuming one layout for everyone.
+# instead of each project's full source. What to keep can differ per upstream
+# (tuicr publishes skills/ at its root), so each submodule lists its own
+# sparsePath entries in .gitmodules (repeat the key to keep more than one) and the
+# loop reads them, rather than assuming one layout for everyone.
 if [ -f "$DOTFILES_DIR/.gitmodules" ]; then
     if [[ "$DRY_RUN" == "true" ]]; then
         log_info "[DRY RUN] Would run: git submodule update --init --remote vendor/"

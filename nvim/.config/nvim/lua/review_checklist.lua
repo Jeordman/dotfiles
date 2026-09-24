@@ -18,8 +18,7 @@
 --  "N hidden" count and can reveal/unhide them, so nothing vanishes silently.
 --
 --  Both sets are pruned to the current change-set on every read, so the file
---  never accumulates stale cruft. The companion `mark_reviewed.py`
---  (review-checklist skill) reads/writes the same file with the same rules.
+--  never accumulates stale cruft.
 -- ============================================================================
 
 local M = {}

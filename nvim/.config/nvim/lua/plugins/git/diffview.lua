@@ -38,8 +38,6 @@
 --  lua/review_checklist.lua) and AUTO-EXPIRE when a file changes again — so
 --  re-editing a file you'd ticked makes it show up unreviewed. Hidden files are
 --  dropped from the list (a "N hidden" count stays visible; H reveals them).
---  Claude can tick OR hide files via the review-checklist skill — e.g. "narrow
---  the list to just what needs human eyes". Reopen <leader>rc to see its changes.
 -- ============================================================================
 
 local rc = require 'review_checklist'

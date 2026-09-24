@@ -53,7 +53,6 @@ dev-cloud: cloud-mode workspace for $(basename "$WORK_DIR")
 
   next:  cloud-ticket-dispatch ${TICKET:-<TICKET>}
          → pushes the branch, hands the ticket to a cloud session
-         (or /cloud-ticket ${TICKET:-<TICKET>} from the claude pane)
 
   then:  manage the run in the Claude UI — cloud sessions are not visible
          from the terminal. A native notification arrives when it finishes.

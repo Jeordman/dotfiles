@@ -88,8 +88,6 @@ Codex is registered as an MCP server for Claude Code (see `install/modules/05-do
 - **Codex is consulted.** It's a different model family with different blind spots, used as a second opinion on high-value work.
 
 **When Codex runs** (all explicit — no skill auto-triggers Codex anymore):
-- `/codex-review` — explicit code review of the current diff (dumps Codex output raw, then Claude adds notes).
-- `/codex-plan-review` — explicit gap analysis of a plan file (appends findings to the plan).
 - `/debate-plan` — Claude and Codex each produce an initial plan in parallel, then debate back-and-forth under a Team Lead (main Claude) for up to 3 rounds until consensus, then emit a combined plan. Includes a pre-flight warning if either agent is above 60% of its current usage window.
 
 **Cost discipline**: Codex calls aren't free. All Codex invocation is now explicit via slash command — the user decides when a second opinion is worth it. `/debate-plan` caps at 3 debate rounds (≤4 Codex calls total) and pre-flights usage before firing.

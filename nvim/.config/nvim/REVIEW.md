@@ -114,27 +114,6 @@ change down to the handful that actually need your eyes.
 
 ---
 
-## Letting Claude update the checklist
-
-Claude can tick **and** hide files for you, via the `review-checklist` skill
-(in `claude/.claude/skills/review-checklist/`). Useful when Claude has just
-explained a change and you don't need to read every file yourself.
-
-Just say it naturally — no need to mention "checklist":
-
-- *"Check off the files you just explained."*
-- *"Mark everything reviewed except the migration."*
-- *"Hide the lockfile and the snapshots."*
-- *"Narrow the list down to just what needs human eyes"* — Claude judges which
-  files are mechanical/low-risk, hides them, and tells you what it hid and why.
-- *"What's left to review?"*
-
-Claude edits the same state file your checklist reads, then tells you the new
-count. **Reopen `<leader>rc`** to see its changes — the float doesn't refresh
-while it's open.
-
----
-
 ## Where the state lives
 
 `<git-dir>/nvim-review-checklist.json` (i.e. inside `.git/`), per repo. It holds
