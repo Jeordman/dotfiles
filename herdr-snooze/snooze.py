@@ -141,7 +141,9 @@ def locked_state():
 
 
 def sock_path():
-    return os.environ.get("HERDR_SOCKET") or os.path.expanduser(
+    # HERDR_SOCKET_PATH is what herdr exports to plugins and panes. The default
+    # below only matches the default server, so a named session needs the env.
+    return os.environ.get("HERDR_SOCKET_PATH") or os.path.expanduser(
         "~/.config/herdr/herdr.sock"
     )
 
@@ -661,21 +663,6 @@ def pid_path():
     return os.path.join(state_dir(), f"daemon-{server_key()}.pid")
 
 
-def daemon_running():
-    """Advisory check for callers. The real guarantee is the lock in
-    cmd_daemon; this only avoids spawning a process that would exit anyway."""
-    try:
-        with open(pid_path()) as f:
-            pid = int(f.read().strip())
-    except (FileNotFoundError, ValueError):
-        return False
-    try:
-        os.kill(pid, 0)
-    except OSError:
-        return False
-    return pid != os.getpid()
-
-
 # ------------------------------------------------------------------- events
 
 # Herdr appends a new Space to the end of the sidebar, which is underneath the
@@ -844,9 +831,13 @@ def cmd_daemon():
 
 def cmd_ensure_daemon():
     """Spawn the ticker detached and return at once, so a startup hook or a
-    fresh snooze never blocks on it."""
-    if daemon_running():
-        return
+    fresh snooze never blocks on it.
+
+    Always spawns and lets the lock in cmd_daemon turn away a duplicate. A
+    pidfile check was wrong after a reboot: the file survives, macOS reuses
+    low pids, and an unrelated process holding the old pid meant no ticker at
+    all. The kernel drops the lock with its holder, so it cannot go stale.
+    """
     subprocess.Popen(
         [sys.executable, os.path.abspath(__file__), "daemon"],
         stdin=subprocess.DEVNULL,

@@ -9,7 +9,7 @@ reach the other machines until it earns its place in `STOW_PACKAGES`.
 ## Why it looks like this
 
 The obvious design is a collapsible "Snoozed" folder. Herdr cannot do that for
-ordinary Spaces, checked against 0.9.1:
+ordinary Spaces, checked against 0.9.1 and again against 0.9.2:
 
 - The socket API has no collapse, fold, group, hide, or archive concept.
 - `[ui.sidebar.spaces]` has only `rows` and `row_gap`, so there is no way to
@@ -121,10 +121,26 @@ undocumented and can break on upgrade; `snooze.py` is the only thing that
 talks to it.
 
 A single ticker process refreshes countdowns every 60s and wakes anything due.
-It starts on the first snooze, is restarted by the plugin's startup hook after
-a herdr restart, and exits by itself once nothing is snoozed — so there is no
-launchd agent and no process running when nothing is snoozed. Singleton guard
-is a pidfile beside the state.
+It never exits on its own, even with nothing snoozed, because it also owns the
+branch name on every Space row (`$branch_`): stopping it would let those expire
+and blank out. Singleton guard is an exclusive lock on
+`daemon-<key>.pid.lock`; the pidfile beside it is advisory.
+
+The ticker is spawned detached (`start_new_session`), so it is not a child of
+the herdr server:
+
+- **herdr restart or upgrade**: the ticker keeps running. Its socket calls fail
+  while the server is down, the loop swallows the errors, and the next tick
+  after the server returns re-applies everything. Names and order come back
+  with herdr's saved layout, and workspace ids survive the restart, so the
+  state file still matches them.
+- **Reboot**: the ticker dies. There is no launchd agent, so nothing runs until
+  herdr starts; its `[[startup]]` hook then runs `ensure-daemon`. The first tick
+  wakes, with an alert, anything that came due while the machine was off, then
+  restores countdowns and ordering.
+- **Editing `snooze.py`**: the running ticker keeps the code it started with.
+  Picker, CLI and actions run fresh each time, but a change to the tick loop
+  needs the ticker killed and `python3 snooze.py ensure-daemon` run.
 
 State lives in `HERDR_PLUGIN_STATE_DIR` (falling back to
 `~/.local/state/herdr-snooze/`), never in this repo.
