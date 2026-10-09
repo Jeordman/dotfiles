@@ -28,6 +28,9 @@ ensure_package "rg" "ripgrep" "ripgrep"
 # fzf (fuzzy finder)
 ensure_package "fzf" "fzf" "fzf"
 
+# gum (terminal prompts; tk's local/cloud picker)
+ensure_package "gum" "gum" "gum"
+
 # fd (fast find alternative, used by Telescope)
 # Debian/Ubuntu ship the binary as `fdfind` to avoid a clash with an older
 # package, so the alias below is what actually puts `fd` on PATH.

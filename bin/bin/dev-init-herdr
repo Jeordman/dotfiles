@@ -131,11 +131,11 @@ fi
 RC_NAME="$(basename "$WORK_DIR")"
 claude_cmd="claude --remote-control \"$RC_NAME\" --effort xhigh"
 if [ -n "$TICKET" ]; then
-  prompt="Use the ClickUp MCP to search for task $TICKET. Read the task description and create an implementation plan."
+  prompt="Use the ClickUp MCP to search for task $TICKET. Read the task description and create an implementation plan. When the work is done and tsc + lint pass, run: tk review"
   if [ -f "$WORK_DIR/.claude/skills/planning/SKILL.md" ]; then
     prompt="/planning $prompt"
   fi
-  claude_cmd="claude --remote-control \"$RC_NAME\" --effort xhigh --permission-mode acceptEdits \"$prompt\""
+  claude_cmd="claude --remote-control \"$RC_NAME\" --effort xhigh --permission-mode auto \"$prompt\""
 fi
 
 # Run the commands. `herdr pane run` writes the command + Enter in one call, and
@@ -147,7 +147,14 @@ echo "Starting Neovim in tab 2..."
 herdr pane run "$TAB2_PANE" "nvim ." >/dev/null
 
 if [ -n "$TAB3_PANE" ]; then
-  echo "Shell ready in tab 3."
+  # tk's cloud mode sets TK_TAB3_CMD (e.g. `tk watch ECOM-1234`) to dispatch the
+  # ticket and watch for the cloud session's commits from this tab.
+  if [ -n "${TK_TAB3_CMD:-}" ]; then
+    echo "Running in tab 3: $TK_TAB3_CMD"
+    herdr pane run "$TAB3_PANE" "$TK_TAB3_CMD" >/dev/null
+  else
+    echo "Shell ready in tab 3."
+  fi
 fi
 
 CALLER_PANE="${HERDR_PANE_ID:-}"

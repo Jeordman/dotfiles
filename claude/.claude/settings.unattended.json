@@ -157,6 +157,15 @@
             "timeout": 300
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/bin/tk\" hook-stop",
+            "timeout": 20
+          }
+        ]
       }
     ]
   },

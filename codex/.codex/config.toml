@@ -1,23 +1,22 @@
-model = "gpt-5.5"
-approval_policy = "on-failure"
+model = "gpt-6-luna"
+approval_policy = "on-request"
+approvals_reviewer = "auto_review"
 sandbox = true
-model_reasoning_effort = "xhigh"
+model_reasoning_effort = "medium"
 notify = [
     "/Users/jeordin.callister/.codex/computer-use/Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.app/Contents/MacOS/SkyComputerUseClient",
     "turn-ended",
 ]
 
 [tui]
-status_line = [
-    "model-with-reasoning",
-    "context-used",
-    "five-hour-limit",
-    "weekly-limit",
-]
+status_line = ["model-with-reasoning", "context-used", "five-hour-limit", "weekly-limit", "permissions"]
+screen_reader_detection_done = true
+status_line_use_colors = true
 
 [tui.model_availability_nux]
 "gpt-5.5" = 4
 "gpt-5.6-sol" = 4
+"gpt-6.1-sol" = 4
 
 [sandbox_workspace_write]
 writable_roots = [
@@ -62,15 +61,18 @@ startup_timeout_sec = 120
 NODE_REPL_NATIVE_PIPE_CONNECT_TIMEOUT_MS = "1000"
 NODE_REPL_NODE_MODULE_DIRS = "/Applications/ChatGPT.app/Contents/Resources/cua_node/lib/node_modules"
 NODE_REPL_NODE_PATH = "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node"
-NODE_REPL_TRUSTED_CODE_PATHS = "/Users/jeordin.callister/.codex"
+NODE_REPL_TRUSTED_CODE_PATHS = "/Users/jeordin.callister/.codex:/Applications/ChatGPT.app/Contents/Resources/cua_node/lib/node_modules"
 CODEX_HOME = "/Users/jeordin.callister/.codex"
-NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "0b03c76c1d0f3d4c81f89f58ff210ae6709fd1204d2c5a4fdffa0a7bdb961b96,6d25aa7656feac858f3a3bdaea5bcbab0dbfd426c9de8e6931ce90c399ee8e4f"
-BROWSER_USE_AVAILABLE_BACKENDS = "chrome"
-NODE_REPL_INSTRUCTIONS_USE_CASE_CHROME = "Control the Chrome browser in conjunction with the Chrome Plugin. Prefer this method of controlling Chrome over alternatives (such as Computer Use) unless the user explicitly mentions an alternative."
-NODE_REPL_INSTRUCTIONS_USE_CASE_COMPUTER_USE = "Control desktop apps on macOS through Computer Use."
+BROWSER_USE_AVAILABLE_BACKENDS = "chrome,iab,mcpapps"
+BROWSER_USE_TINYSKY_ENABLED = "1"
+NODE_REPL_INSTRUCTIONS_USE_CASE_BROWSER = ""
+NODE_REPL_INSTRUCTIONS_USE_CASE_CHROME = ""
+NODE_REPL_INSTRUCTIONS_USE_CASE_COMPUTER_USE = ""
 BROWSER_USE_CODEX_APP_BUILD_FLAVOR = "prod"
-BROWSER_USE_CODEX_APP_VERSION = "26.715.61943"
-CODEX_CLI_PATH = "/Applications/ChatGPT.app/Contents/Resources/codex"
+BROWSER_USE_CODEX_APP_VERSION = "26.930.51102"
+NODE_REPL_TRUSTED_SERVICES = '{"browser":"/Users/jeordin.callister/.codex/plugins/cache/openai-bundled/browser/26.930.51102/scripts/browser-service.mjs","sky":"@oai/sky/service"}'
+SKY_CUA_SERVICE_PATH = "/Users/jeordin.callister/.codex/computer-use/Codex Computer Use.app"
+CODEX_CLI_PATH = "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"
 
 [mcp_servers.clickup]
 url = "https://mcp.clickup.com/mcp"
@@ -87,21 +89,20 @@ args = ["@playwright/mcp@latest"]
 command = "./Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.app/Contents/MacOS/SkyComputerUseClient"
 args = ["mcp"]
 cwd = "."
-enabled = false
+enabled = true
 
 [marketplaces.openai-bundled]
-last_updated = "2026-08-25T14:58:18Z"
 source_type = "local"
 source = "/Users/jeordin.callister/.codex/.tmp/bundled-marketplaces/openai-bundled"
 
 [marketplaces.claude-plugins-official]
-last_updated = "2026-08-30T14:05:18Z"
-last_revision = "ed404106fcd80ba98ecb7c851e531dcb626d13b7"
+last_updated = "2026-10-05T17:15:55Z"
+last_revision = "d182ca456ca09d31d139f7d3818d1d333b103cce"
 source_type = "git"
 source = "https://github.com/anthropics/claude-plugins-official.git"
 
 [marketplaces.openai-primary-runtime]
-last_updated = "2026-07-21T15:20:41Z"
+last_updated = "2026-10-05T17:20:19Z"
 source_type = "local"
 source = "/Users/jeordin.callister/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
 
@@ -141,6 +142,18 @@ enabled = true
 [plugins."browser@openai-bundled"]
 enabled = true
 
+[plugins."codex-app-tools@openai-bundled"]
+enabled = true
+
+[plugins."unified-computer-use@openai-bundled"]
+enabled = true
+
+[plugins."code-review@openai-bundled"]
+enabled = true
+
+[plugins."computer-use@openai-bundled"]
+enabled = true
+
 [features]
 hooks = true
 js_repl = false
@@ -153,7 +166,27 @@ trusted_hash = "sha256:8d29c14f64975ac6399d7dacbeec3a658ee4323d734b8ba4d8e44baff
 [hooks.state."/Users/jeordin.callister/.codex/hooks.json:session_start:0:0"]
 trusted_hash = "sha256:eb1f4f49f832327e0940aac8d45289046446d6ce60c7ee0d69781756ac47679d"
 
+[hooks.state."/Users/jeordin.callister/.codex/hooks.json:session_start:1:0"]
+trusted_hash = "sha256:84a42fdc3740fdc06c3b59dd663999a437c877af25038f30f32bdccfea018978"
+
+[hooks.state."/Users/jeordin.callister/.codex/hooks.json:user_prompt_submit:0:0"]
+trusted_hash = "sha256:536034a3106960d0391f8ed5ee43493be731207368ff3ec03c15bb72e7adbc95"
+
+[hooks.state."/Users/jeordin.callister/.codex/hooks.json:stop:1:0"]
+trusted_hash = "sha256:320ee23deed6c947e178cc56ec2305023e05be6ea8008cb5bb9b670c6a8a0967"
+
+[hooks.state."/Users/jeordin.callister/unicity/new-shop/.codex/hooks.json:pre_tool_use:0:0"]
+trusted_hash = "sha256:ed7e914fb5742cd4a21d3fcece7b02f4bb2c344f57996ae9c52cd4bdcbfe947a"
+
 [shell_environment_policy.set]
-BROWSER_USE_AVAILABLE_BACKENDS = "chrome"
-NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "0b03c76c1d0f3d4c81f89f58ff210ae6709fd1204d2c5a4fdffa0a7bdb961b96,6d25aa7656feac858f3a3bdaea5bcbab0dbfd426c9de8e6931ce90c399ee8e4f"
-NODE_REPL_TRUSTED_CODE_PATHS = "/Users/jeordin.callister/.codex"
+NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "6d25aa7656feac858f3a3bdaea5bcbab0dbfd426c9de8e6931ce90c399ee8e4f,d0b55a8f9e8e7e9c88421416ea4ce9542c302abf43aa7fc871be4553ea70dd26"
+
+[desktop]
+conversationDetailMode = "STEPS_COMMANDS"
+ambient-suggestions-enabled = true
+dock-icon-preference = "app-default"
+followUpQueueMode = "queue"
+confirm-before-close = "never"
+
+[apps.connector_690a90ec05c881918afb6a55dc9bbaa1.tools."vercel.web_fetch_vercel_url"]
+approval_mode = "approve"

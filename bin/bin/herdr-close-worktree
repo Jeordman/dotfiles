@@ -85,7 +85,7 @@ done <<< "$paths"
 while IFS= read -r l; do
   [ -n "$l" ] || continue
   candidates="$candidates$(printf '%s' "$ws_list" | jq -r \
-    --arg l "$l" '.result.workspaces[]? | select(.label == $l) | .workspace_id' 2>/dev/null)"$'\n'
+    --arg l "$l" '.result.workspaces[]? | select(.label == $l or .label == ("☁️ " + $l)) | .workspace_id' 2>/dev/null)"$'\n'
 done <<< "$labels"
 
 closed=""

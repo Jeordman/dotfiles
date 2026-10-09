@@ -98,3 +98,7 @@ Codex is registered as an MCP server for Claude Code (see `install/modules/05-do
 - The install script handles backups automatically
 - Each machine can pull updates with `git pull` then `stow -R <package>` to restow
 - Never commit secrets - use `~/.zshrc.local` instead
+
+## ClickUp
+
+Board, section epics, Quarter field ids and the `tk` ticket flow: `docs/private/clickup.md` (gitignored).

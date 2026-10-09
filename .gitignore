@@ -13,3 +13,9 @@ claude/.claude/skills/superset/
 # account+org UUID). Claude Code rewrites it on sync, and ~/.claude/skills is a
 # symlink into this repo, so it lands here uninvited. Nothing here is authored.
 claude/.claude/skills/synced/
+
+# Employer-internal notes (ClickUp ids, board layout). Kept local; this repo is public.
+docs/private/
+
+# Skills deleted through the desktop app land here; some carry third-party licenses.
+claude/.claude/skills/.trash/

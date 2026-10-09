@@ -110,6 +110,17 @@ Nobody can read this session's output from a terminal, so git is the only channe
 
 Never claim something works that you did not exercise. Untested is a fine thing to write down; a false pass is not."
 
+# tk passes the ticket's description and comments in a file, because nothing has
+# confirmed a cloud session can reach ClickUp. Inline it so the session has the
+# requirements either way.
+if [ -n "${TK_TICKET_CONTEXT:-}" ] && [ -r "$TK_TICKET_CONTEXT" ]; then
+  PROMPT="$PROMPT
+
+The ticket as of dispatch (description and comments, copied from ClickUp in case it isn't reachable from here):
+
+$(cat "$TK_TICKET_CONTEXT")"
+fi
+
 OUT=$(script -q /dev/null claude --permission-mode bypassPermissions --cloud "$PROMPT" 2>&1)
 CLEAN=$(printf '%s' "$OUT" | sed -e 's/\x1b\[[0-9;?]*[a-zA-Z]//g' -e 's/\r/\n/g')
 URL=$(printf '%s' "$CLEAN" | grep -oE 'https://claude\.ai/code/session_[A-Za-z0-9]+' | head -1)

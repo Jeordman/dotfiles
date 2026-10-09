@@ -5,6 +5,18 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 
+# Normalize fpath before oh-my-zsh builds its completion cache. `brew shellenv`
+# (.zprofile) does `export FPATH`, so every child shell — herdr panes, Claude,
+# Codex, nvim, lazygit — inherits its parent's fully-built fpath and has
+# oh-my-zsh's dirs stacked on top again. oh-my-zsh keys ~/.zcompdump on the
+# exact fpath, so shells at different nesting depths kept invalidating each
+# other's cache and every new terminal paid a full ~300ms compinit rebuild.
+# Strip whatever this file adds (everything under $HOME) and dedupe, so fpath
+# comes out identical no matter what launched the shell.
+typeset -U fpath
+fpath=(${fpath:#$HOME/*})
+[[ -n $HOMEBREW_PREFIX ]] && fpath=("$HOMEBREW_PREFIX/share/zsh/site-functions" $fpath)
+
 # If you come from bash you might have to change your $PATH.
 export PATH=$HOME/bin:/usr/local/bin:$PATH
 

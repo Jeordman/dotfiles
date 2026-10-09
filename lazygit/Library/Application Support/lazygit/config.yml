@@ -7,21 +7,20 @@ gui:
     inactiveBorderColor: ['#3A3A3A']
     searchingActiveBorderColor: ['#E2D1AD']
     optionsTextColor: ['#767676']
-    selectedLineBgColor: ['#242424']          # herdr active_row_bg
+    selectedLineBgColor: ['#242424'] # herdr active_row_bg
     inactiveViewSelectedLineBgColor: ['#1C1C1C']
     cherryPickedCommitFgColor: ['#91ADDB']
     cherryPickedCommitBgColor: ['#242424']
     markedBaseCommitFgColor: ['#E2D1AD']
     markedBaseCommitBgColor: ['#242424']
-    unstagedChangesColor: ['#D95F5F']         # true red (hue 0), matches nvim git red
+    unstagedChangesColor: ['#D95F5F'] # true red (hue 0), matches nvim git red
     defaultFgColor: ['#EDEDED']
-  # One gray for every author instead of per-author cyan/magenta.
-  authorColors:
-    '*': '#909090'
+    # One gray for every author instead of per-author cyan/magenta.
+    authorColors:
+      '*': '#909090'
 git:
   pull:
     mode: "rebase"
-
 os:
   # ~/bin/clipcopy picks pbcopy / wl-copy / xclip by platform.
   copyToClipboardCmd: 'printf "%s" "{{text}}" | "$HOME/bin/clipcopy"'

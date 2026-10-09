@@ -1,0 +1,779 @@
+#!/usr/bin/env python3
+"""tk — start a ClickUp ticket in one command.
+
+    tk ECOM-7012                 existing ticket (or paste its ClickUp URL)
+    tk "CO checkout hides Efecty"  new ticket: opens Claude with /create-ticket
+    tk start ECOM-7012 [--points N]  what the create session runs once the ticket exists
+    tk review                    in a worktree: mark the ticket "ready for code review"
+
+Flags for start: --fix (fix/ prefix)  --local / --cloud (skip the picker)  -n (dry run)
+
+Personal workflow, deliberately not shared repo tooling. Every ClickUp change is a
+plain REST call with CLICKUP_TOKEN (set in ~/.zshrc.local), so the fixed steps use
+no tokens and always run. Claude is only started for the steps that need judgment:
+writing a new ticket, and the implementation itself.
+
+Internal subcommands, called by hooks and dev-init-herdr rather than by hand:
+    tk watch ECOM-7012   cloud mode, runs in the worktree's shell tab
+    tk hook-created      PostToolUse hook in the ticket-writing session
+    tk hook-stop         Stop hook, global (see claude/.claude/settings.json)
+"""
+
+import datetime as dt
+import hashlib
+import json
+import os
+import re
+import shutil
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+TEAM_ID = os.environ.get("TK_CLICKUP_TEAM_ID", "")
+ME = int(os.environ.get("TK_CLICKUP_USER_ID") or 0)
+SPRINT_FOLDER = os.environ.get("TK_CLICKUP_SPRINT_FOLDER", "")
+REPO = os.path.expanduser("~/unicity/new-shop")
+DEFAULT_BRANCH = "master"
+
+# The oddly named "Status" dropdown on the Ecommerce space is really a task type.
+TYPE_FIELD = "1f0afc86-faf5-4d9e-be96-17858b426c8c"
+TYPE_BUG = "276ed931-41b0-43a6-88f1-d9baaddc330f"
+TYPE_BUG_INDEX = 2
+
+IN_DEV = "in development"
+READY = "ready for code review"
+
+TICKET_RE = re.compile(r"\bECOM-\d+\b", re.I)
+URL_RE = re.compile(r"app\.clickup\.com/t/(?:\d+/)?([A-Za-z0-9-]+)")
+SPRINT_RE = re.compile(r"^Sprint (\d+) \((\d+)/(\d+)\s*-\s*(\d+)/(\d+)\)")
+
+CLOUD_BADGE = "☁️ "  # name prefix on a cloud Space; gtr-clean strips it too
+WATCH_INTERVAL = 60
+WATCH_TIMEOUT = 2 * 3600
+WATCH_QUIET = 10 * 60  # no new commits for this long = the cloud session is done
+
+DRY = False
+
+
+# ------------------------------------------------------------------ output
+
+
+def say(msg):
+    print(f"tk: {msg}", flush=True)
+
+
+def die(msg, code=2):
+    print(f"tk: {msg}", file=sys.stderr, flush=True)
+    sys.exit(code)
+
+
+def notify(msg):
+    sock = os.environ.get("HERDR_SOCKET_PATH") or os.path.expanduser("~/.config/herdr/herdr.sock")
+    if shutil.which("herdr") and os.path.exists(sock):
+        done = subprocess.run(
+            ["herdr", "notification", "show", "tk", "--body", msg, "--sound", "done"],
+            capture_output=True,
+        )
+        if done.returncode == 0:
+            return
+    subprocess.run(
+        ["osascript", "-e", f"display notification {json.dumps(msg)} with title \"tk\""],
+        capture_output=True,
+    )
+
+
+def tty():
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+
+# ------------------------------------------------------------------ ClickUp
+
+
+def api(method, path, body=None, v3=False, write=False):
+    """One ClickUp REST call. Writes are skipped (and printed) under -n."""
+    if write and DRY:
+        say(f"dry run: {method} {path} {json.dumps(body) if body else ''}")
+        return {}
+    token = os.environ.get("CLICKUP_TOKEN")
+    if not token:
+        die("CLICKUP_TOKEN is not set. Add `export CLICKUP_TOKEN=pk_...` to ~/.zshrc.local "
+            "(ClickUp → Settings → Apps → API Token).")
+    missing = [n for n in ("TK_CLICKUP_TEAM_ID", "TK_CLICKUP_USER_ID", "TK_CLICKUP_SPRINT_FOLDER")
+               if not os.environ.get(n)]
+    if missing:
+        die(f"{', '.join(missing)} not set. Add them to ~/.zshrc.local.")
+    base = "https://api.clickup.com/api/v3" if v3 else "https://api.clickup.com/api/v2"
+    req = urllib.request.Request(
+        base + path,
+        method=method,
+        data=json.dumps(body).encode() if body is not None else None,
+        headers={"Authorization": token, "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            raw = r.read()
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode(errors="replace")[:300]
+        raise RuntimeError(f"ClickUp {method} {path} → {e.code}: {detail}") from None
+    return json.loads(raw) if raw.strip() else {}
+
+
+def get_task(ref):
+    """Fetch by ECOM-1234 or by internal id (from a URL)."""
+    q = "include_markdown_description=true"
+    if TICKET_RE.fullmatch(ref):
+        q += f"&custom_task_ids=true&team_id={TEAM_ID}"
+        ref = ref.upper()
+    try:
+        return api("GET", f"/task/{ref}?{q}")
+    except RuntimeError as e:
+        if " 404" in str(e) or "ITEM_015" in str(e) or "OAUTH_" not in str(e) and "not found" in str(e).lower():
+            die(f"{ref} not found in ClickUp")
+        raise
+
+
+def list_statuses(list_id):
+    return api("GET", f"/list/{list_id}").get("statuses", [])
+
+
+def status_rank(statuses, name):
+    for s in statuses:
+        if s["status"].lower() == name.lower():
+            return s["orderindex"]
+    return None
+
+
+def set_status(task, name):
+    api("PUT", f"/task/{task['id']}", {"status": name}, write=True)
+
+
+def ticket_id(task):
+    return task.get("custom_id") or task["id"]
+
+
+# ------------------------------------------------------------------ sprint
+
+
+def sprint_dates(today=None):
+    """Delivery Sprint lists, newest first, as (list, start, end).
+
+    Dates come from the list name, e.g. "Sprint 77 (10/9 - 10/16)". The names
+    carry no year and the folder keeps every sprint ever, so only the run of
+    sprints down to the first one that has already ended is returned — that is
+    what keeps last year's "10/1 - 10/14" out of it.
+    """
+    today = today or dt.date.today()
+    lists = api("GET", f"/folder/{SPRINT_FOLDER}/list?archived=false").get("lists", [])
+    parsed = []
+    for lst in lists:
+        m = SPRINT_RE.match(lst["name"])
+        if m:
+            n, sm, sd, em, ed = map(int, m.groups())
+            parsed.append((n, sm, sd, em, ed, lst))
+    parsed.sort(key=lambda s: -s[0])
+
+    def nearest(month, day):
+        cands = [dt.date(today.year + k, month, day) for k in (-1, 0, 1)]
+        return min(cands, key=lambda d: abs((d - today).days))
+
+    out = []
+    for n, sm, sd, em, ed, lst in parsed:
+        start = nearest(sm, sd)
+        end = dt.date(start.year + (1 if (em, ed) < (sm, sd) else 0), em, ed)
+        out.append((lst, start, end))
+        if end < today:
+            break
+    return out
+
+
+def current_sprint(today=None):
+    """The sprint whose dates include today; the one ending today wins an overlap."""
+    today = today or dt.date.today()
+    covering = [(lst, end) for lst, start, end in sprint_dates(today) if start <= today <= end]
+    if not covering:
+        die(f"no sprint covers {today.month}/{today.day} — create it in ClickUp first")
+    return min(covering, key=lambda c: c[1])[0]
+
+
+def planned_sprint(task, today=None):
+    """A sprint the task is already in that hasn't ended (current or planned ahead)."""
+    today = today or dt.date.today()
+    for lst, start, end in sprint_dates(today):
+        if end >= today and in_list(task, lst["id"]):
+            return lst
+    return None
+
+
+def in_list(task, list_id):
+    if task["list"]["id"] == list_id:
+        return True
+    return any(loc.get("id") == list_id for loc in task.get("locations", []))
+
+
+def put_in_sprint(task, sprint):
+    if in_list(task, sprint["id"]):
+        say(f"sprint: already in {sprint['name']}")
+        return
+    home = task["list"]
+    if status_rank(list_statuses(home["id"]), IN_DEV) is not None:
+        # Same as the "Add to Sprint" button: stays in its home list too.
+        api("POST", f"/list/{sprint['id']}/task/{task['id']}", write=True)
+        say(f"sprint: added to {sprint['name']}")
+    else:
+        # New Requests and friends have no "in development"; drag it over.
+        api("PUT", f"/workspaces/{TEAM_ID}/tasks/{task['id']}/home_list/{sprint['id']}",
+            {}, v3=True, write=True)
+        say(f"sprint: moved from {home['name']} to {sprint['name']}")
+
+
+# ------------------------------------------------------------------ git
+
+
+def git(*args, cwd=REPO, check=False):
+    r = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+    if check and r.returncode != 0:
+        die(f"git {' '.join(args)} failed: {r.stderr.strip()}")
+    return r.stdout.strip()
+
+
+def slug(title):
+    words = re.sub(r"[^a-z0-9]+", " ", title.lower()).split()[:6]
+    while len(words) > 1 and len("-".join(words)) > 50:
+        words.pop()  # drop whole words, never cut one in half
+    return "-".join(words)[:50]
+
+
+def is_bug(task):
+    if any(t["name"].lower() == "bug" for t in task.get("tags", [])):
+        return True
+    for f in task.get("custom_fields", []):
+        if f.get("id") == TYPE_FIELD and f.get("value") in (TYPE_BUG, TYPE_BUG_INDEX, str(TYPE_BUG_INDEX)):
+            return True
+    if task.get("parent"):
+        try:
+            if api("GET", f"/task/{task['parent']}").get("name", "").strip().upper() == "BUGS":
+                return True
+        except RuntimeError:
+            pass
+    return False
+
+
+def branch_for(task, force_fix):
+    tid = ticket_id(task)
+    subprocess.run(["git", "fetch", "--quiet", "origin"], cwd=REPO, capture_output=True, timeout=60)
+    refs = git("for-each-ref", "--format=%(refname:short)", "refs/heads", "refs/remotes/origin").splitlines()
+    pat = re.compile(rf"(^|/){re.escape(tid)}(-|$)", re.I)
+    for ref in refs:
+        name = ref.removeprefix("origin/")
+        if name != "HEAD" and pat.search(name):
+            say(f"branch: {name} (already exists, reusing)")
+            return name
+    prefix = "fix" if force_fix or is_bug(task) else "feat"
+    name = f"{prefix}/{tid}-{slug(task['name'])}"
+    say(f"branch: {name}")
+    return name
+
+
+def worktree_for(branch):
+    path = None
+    for line in git("worktree", "list", "--porcelain").splitlines():
+        if line.startswith("worktree "):
+            path = line[9:]
+        elif line == f"branch refs/heads/{branch}":
+            return path
+    return None
+
+
+# ------------------------------------------------------------------ prompts
+
+
+def gum(*args):
+    """Run gum attached to the terminal; None if gum is missing or cancelled."""
+    if not shutil.which("gum"):
+        return None
+    r = subprocess.run(["gum", *args], stdout=subprocess.PIPE, text=True)
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def ask_points(tid):
+    if not tty():
+        die(f"{tid} has no points. Re-run with --points N.")
+    while True:
+        val = gum("input", "--header", f"Points for {tid}:", "--placeholder", "e.g. 2")
+        if val is None:
+            val = input(f"Points for {tid}: ").strip()
+        if val == "":
+            die("cancelled — no points set, nothing else changed")
+        try:
+            return float(val) if "." in val else int(val)
+        except ValueError:
+            say("points must be a number")
+
+
+def confirm(question):
+    if not tty():
+        return False
+    if shutil.which("gum"):
+        return subprocess.run(["gum", "confirm", question]).returncode == 0
+    return input(f"{question} [y/N] ").strip().lower() == "y"
+
+
+def pick_mode(task, points):
+    cloud_on = os.environ.get("TK_CLOUD") == "1"
+    suggest = "cloud" if points == 1 else "local"
+    if not tty():
+        die("no terminal for the picker. Re-run with --local or --cloud.")
+    cloud_label = "☁️  Cloud" + ("" if cloud_on else "   (off until the /remote-env test passes)")
+    local_label = "💻 Local"
+    opts = [cloud_label, local_label] if suggest == "cloud" else [local_label, cloud_label]
+    pts = f"{points} point{'s' if points != 1 else ''}" if points is not None else "no points"
+    header = f"{ticket_id(task)} · {pts} · {task['name']}\n\nWhere should this run?"
+    while True:
+        choice = gum("choose", "--header", header, *opts)
+        if choice is None:
+            choice = input(f"{header} [local/cloud] ({suggest}): ").strip().lower() or suggest
+        if choice == "":
+            return None
+        if choice.startswith("☁") or choice == "cloud":
+            if cloud_on:
+                return "cloud"
+            say("cloud is off. Set TK_CLOUD=1 in ~/.zshrc.local after the /remote-env test passes.")
+            continue
+        return "local"
+
+
+# ------------------------------------------------------------------ herdr
+
+
+def herdr_rpc(method, params):
+    path = os.environ.get("HERDR_SOCKET_PATH") or os.path.expanduser("~/.config/herdr/herdr.sock")
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.settimeout(5)
+    try:
+        s.connect(path)
+        s.sendall((json.dumps({"jsonrpc": "2.0", "id": "tk", "method": method, "params": params}) + "\n").encode())
+        buf = b""
+        while b"\n" not in buf:
+            chunk = s.recv(65536)
+            if not chunk:
+                break
+            buf += chunk
+    finally:
+        s.close()
+    resp = json.loads(buf.split(b"\n")[0])
+    if "error" in resp:
+        raise RuntimeError(f"{method}: {resp['error']}")
+    return resp.get("result", {})
+
+
+def set_cloud_badge(on):
+    ws_id = os.environ.get("HERDR_WORKSPACE_ID")
+    if not ws_id:
+        return
+    try:
+        spaces = herdr_rpc("workspace.list", {}).get("workspaces", [])
+        label = next((w["label"] for w in spaces if w["workspace_id"] == ws_id), None)
+        if label is None:
+            return
+        bare = label.replace(CLOUD_BADGE, "", 1) if CLOUD_BADGE in label else label
+        if on and CLOUD_BADGE not in label:
+            # Keep a 💤 snooze prefix in front so snooze can still find and strip it.
+            new = ("💤 " + CLOUD_BADGE + bare[2:].lstrip()) if bare.startswith("💤 ") else CLOUD_BADGE + bare
+        elif not on and CLOUD_BADGE in label:
+            new = bare
+        else:
+            return
+        herdr_rpc("workspace.rename", {"workspace_id": ws_id, "label": new})
+    except (OSError, RuntimeError, ValueError):
+        pass  # cosmetic; never fail the run over the badge
+
+
+# ------------------------------------------------------------------ start
+
+
+def cmd_start(ref, points=None, force_fix=False, mode=None):
+    in_herdr = os.environ.get("HERDR_ENV") == "1" and os.environ.get("HERDR_PANE_ID")
+    if not in_herdr and not DRY:
+        die("run tk inside herdr — the worktree workspace is built there")
+
+    task = get_task(ref)
+    tid = ticket_id(task)
+    say(f"{tid} · {task['name']}")
+
+    # Create session: record that tk start ran, so its Stop hook lets it finish.
+    state = os.environ.get("TK_CREATE_STATE")
+    if state:
+        _write_json(state, {**_read_json(state), "ticket": tid, "started": True})
+
+    # Assign
+    if any(a["id"] == ME for a in task.get("assignees", [])):
+        say("assigned: you (already)")
+    else:
+        api("PUT", f"/task/{task['id']}", {"assignees": {"add": [ME]}}, write=True)
+        say("assigned: you")
+
+    # Points
+    current = task.get("points")
+    if points is None and current is None:
+        points = ask_points(tid)
+    if points is not None and points != current:
+        api("PUT", f"/task/{task['id']}", {"points": points}, write=True)
+        say(f"points: {points}")
+    else:
+        points = current
+        say(f"points: {points}")
+
+    # Sprint: leave it where someone already planned it; otherwise the current one.
+    sprint = planned_sprint(task)
+    if sprint:
+        say(f"sprint: already in {sprint['name']}")
+    else:
+        sprint = current_sprint()
+        say(f"sprint: {sprint['name']}")
+        put_in_sprint(task, sprint)
+
+    # Status
+    status = task["status"]["status"]
+    ranks = list_statuses(sprint["id"])
+    cur, dev = status_rank(ranks, status), status_rank(ranks, IN_DEV)
+    if status.lower() == IN_DEV:
+        say("status: in development (already)")
+    elif cur is not None and dev is not None and cur > dev and not confirm(
+        f'{tid} is in "{status}". Move it back to in development?'
+    ):
+        say(f"status: left at {status}")
+    else:
+        set_status(task, IN_DEV)
+        say(f"status: {status} → {IN_DEV}")
+
+    # Branch + mode
+    branch = branch_for(task, force_fix)
+    existing = worktree_for(branch)
+    if existing:
+        say(f"worktree already exists: {existing}")
+        return
+    if mode is None:
+        mode = pick_mode(task, points)
+        if mode is None:
+            say("cancelled — ticket is in development, no worktree created")
+            return
+    say(f"mode: {mode}")
+    if DRY:
+        say(f"dry run: would run {'gtrc' if mode == 'cloud' else 'git gtr new'} {branch}")
+        return
+
+    env = dict(os.environ)
+    if mode == "cloud":
+        # dev-init-herdr runs TK_TAB3_CMD in the workspace's shell tab.
+        env["TK_TAB3_CMD"] = f"tk watch {tid}"
+        cmd = ["gtrc", branch, "--yes"]
+    else:
+        cmd = ["git", "gtr", "new", branch, "--yes"]
+    r = subprocess.run(cmd, cwd=REPO, env=env)
+    if r.returncode != 0:
+        die(f"{' '.join(cmd)} failed (exit {r.returncode}) — ClickUp is already updated")
+    say("worktree created, workspace opened in herdr")
+
+
+# ------------------------------------------------------------------ create
+
+
+CREATE_MSG = """/create-ticket {text}
+
+Assign it to me (Jeordin Callister). In the confirmation, also include:
+- a story-points guess with a one-line reason
+- where it should run: cloud or local (suggest cloud for 1 point, local otherwise)
+I'll confirm or change both."""
+
+
+def cmd_create(text):
+    if not (os.environ.get("HERDR_ENV") == "1" and os.environ.get("HERDR_PANE_ID")):
+        die("run tk inside herdr — the worktree workspace is built there")
+    if not shutil.which("claude"):
+        die("claude not found")
+    fd, state = tempfile.mkstemp(prefix="tk-create-", suffix=".json")
+    os.close(fd)
+    _write_json(state, {})
+    hook = os.path.expanduser("~/bin/tk")
+    settings = {
+        "hooks": {
+            "PostToolUse": [{
+                "matcher": "mcp__clickup__clickup_create_task",
+                "hooks": [{"type": "command", "command": f"python3 {hook} hook-created", "timeout": 30}],
+            }]
+        }
+    }
+    fd, settings_path = tempfile.mkstemp(prefix="tk-settings-", suffix=".json")
+    with os.fdopen(fd, "w") as f:
+        json.dump(settings, f)
+    os.environ["TK_CREATE_STATE"] = state
+    os.chdir(REPO)
+    os.execvp("claude", ["claude", "--settings", settings_path, CREATE_MSG.format(text=text)])
+
+
+# ------------------------------------------------------------------ review
+
+
+def branch_ticket(cwd=None):
+    b = git("branch", "--show-current", cwd=cwd or os.getcwd())
+    m = TICKET_RE.search(b)
+    return (m.group(0).upper() if m else None), b
+
+
+def git_dir(cwd=None):
+    d = git("rev-parse", "--absolute-git-dir", cwd=cwd or os.getcwd())
+    return d or None
+
+
+def cmd_review():
+    tid, branch = branch_ticket()
+    if not tid:
+        die(f"no ECOM- ticket in branch '{branch}'")
+    task = get_task(tid)
+    status = task["status"]["status"]
+    ranks = list_statuses(task["list"]["id"])
+    cur, ready = status_rank(ranks, status), status_rank(ranks, READY)
+    if cur is not None and ready is not None and cur >= ready:
+        say(f'status: left at "{status}" (already at or past {READY})')
+    else:
+        set_status(task, READY)
+        say(f"status: {status} → {READY}")
+        notify(f"{tid} ready for your review")
+    gd = git_dir()
+    if gd and not DRY:
+        open(os.path.join(gd, "tk-reviewed"), "w").close()
+
+
+# ------------------------------------------------------------------ cloud watch
+
+
+def ticket_context(task):
+    parts = [f"# {ticket_id(task)}: {task['name']}", "", task.get("markdown_description") or task.get("description") or "(no description)"]
+    try:
+        comments = api("GET", f"/task/{task['id']}/comment").get("comments", [])
+    except RuntimeError:
+        comments = []
+    if comments:
+        parts += ["", "## Comments (oldest first)"]
+        for c in reversed(comments):
+            who = (c.get("user") or {}).get("username", "someone")
+            parts.append(f"- {who}: {c.get('comment_text', '').strip()}")
+    return "\n".join(parts)
+
+
+def remote_sha(branch):
+    subprocess.run(["git", "fetch", "--quiet", "origin", branch], capture_output=True, timeout=60)
+    return git("rev-parse", f"origin/{branch}", cwd=os.getcwd())
+
+
+def cmd_watch(tid):
+    task = get_task(tid)
+    branch = git("branch", "--show-current", cwd=os.getcwd())
+    set_cloud_badge(True)
+
+    fd, ctx = tempfile.mkstemp(prefix=f"tk-{tid}-", suffix=".md")
+    with os.fdopen(fd, "w") as f:
+        f.write(ticket_context(task))
+    r = subprocess.run(["cloud-ticket-dispatch", tid], env={**os.environ, "TK_TICKET_CONTEXT": ctx})
+    if r.returncode != 0:
+        set_cloud_badge(False)
+        notify(f"{tid}: cloud dispatch failed")
+        die("cloud dispatch failed — see above")
+
+    base = remote_sha(branch)
+    say(f"watching origin/{branch} for the cloud session's commits (gives up after 2h)")
+    started, last_sha, last_change = time.time(), base, None
+    while True:
+        time.sleep(WATCH_INTERVAL)
+        sha = remote_sha(branch)
+        now = time.time()
+        if sha != last_sha:
+            last_sha, last_change = sha, now
+            say(f"new commit {sha[:9]} — waiting {WATCH_QUIET // 60}m for more")
+        if last_change and now - last_change >= WATCH_QUIET:
+            break
+        if not last_change and now - started >= WATCH_TIMEOUT:
+            set_cloud_badge(False)
+            notify(f"{tid}: cloud pushed nothing")
+            die("no commits from the cloud session after 2h — check the session")
+
+    subprocess.run(["git", "pull", "--ff-only", "--quiet"])
+    say("cloud is done; waiting for the Vercel preview")
+    r = subprocess.run(["deploy-watch", "-s", last_sha])
+    set_cloud_badge(False)
+    if r.returncode != 0:
+        notify(f"{tid}: preview build failed")
+        die("preview did not build — see above")
+
+    prompt = (f"Verify {tid} on the Vercel preview for commit {last_sha[:9]} using the "
+              f"preview-url-verification skill. The ticket is in {ctx}. Fix anything that "
+              f"doesn't work, push, and re-verify. When it works, run `tk review`.")
+    os.execvp("claude-unattended", ["claude-unattended", prompt])
+
+
+# ------------------------------------------------------------------ hooks
+
+
+def _read_json(path):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def _write_json(path, data):
+    with open(path, "w") as f:
+        json.dump(data, f)
+
+
+def cmd_hook_created():
+    """PostToolUse on clickup_create_task in the ticket-writing session."""
+    state = os.environ.get("TK_CREATE_STATE")
+    payload = json.load(sys.stdin)
+    if not state:
+        return
+    args = payload.get("tool_input") or {}
+    if str(args.get("task_type", "")).lower() == "epic" or not args.get("parent"):
+        return
+    text = json.dumps(payload.get("tool_response", ""))
+    m = TICKET_RE.search(text)
+    tid = m.group(0).upper() if m else None
+    if not tid:
+        # The MCP's reply is {"task_id": "86e3…", "custom_id": null}: the ECOM
+        # number is assigned but not returned, so look it up from the internal id.
+        idm = re.search(r'(?:task_)?id\\*"\s*:\s*\\*"([a-z0-9]{6,})', text)
+        if idm:
+            try:
+                tid = get_task(idm.group(1)).get("custom_id") or idm.group(1)
+            except (RuntimeError, SystemExit):
+                tid = idm.group(1)
+    if not tid:
+        return
+    _write_json(state, {**_read_json(state), "ticket": tid, "started": False})
+    msg = (f"Ticket {tid} was created. Finish any remaining /create-ticket steps (e.g. attaching "
+           f"notes), then run: tk start {tid} --points <the points the user confirmed> "
+           f"--local or --cloud (whichever the user confirmed)")
+    print(json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": msg}}))
+
+
+def cmd_hook_stop():
+    """Stop hook. Two jobs, both silent unless there is something to say.
+
+    1. Ticket-writing session: don't finish until `tk start` has run.
+    2. Worktree session on an ECOM- branch: once per new set of changes, ask
+       Claude whether the work is done and `tk review` should run.
+    Never blocks twice in a row (stop_hook_active), so it cannot loop.
+    """
+    payload = json.load(sys.stdin)
+    if payload.get("stop_hook_active"):
+        return
+
+    state = os.environ.get("TK_CREATE_STATE")
+    if state:
+        s = _read_json(state)
+        if s.get("ticket") and not s.get("started"):
+            _block(f"Ticket {s['ticket']} exists but tk start hasn't run. Run: tk start {s['ticket']} "
+                   f"--points <confirmed points> --local or --cloud")
+        return
+
+    cwd = payload.get("cwd") or os.getcwd()
+    tid, _ = branch_ticket(cwd)
+    gd = git_dir(cwd) if tid else None
+    if not gd or os.path.exists(os.path.join(gd, "tk-reviewed")):
+        return
+    base = git("merge-base", "HEAD", f"origin/{DEFAULT_BRANCH}", cwd=cwd)
+    if not base:
+        return
+    diff = git("diff", base, cwd=cwd)
+    untracked = git("ls-files", "--others", "--exclude-standard", cwd=cwd)
+    if not diff and not untracked:
+        return
+    fp = hashlib.sha256((diff + "\0" + untracked).encode()).hexdigest()
+    fp_file = os.path.join(gd, "tk-asked")
+    try:
+        if open(fp_file).read().strip() == fp:
+            return
+    except OSError:
+        pass
+    with open(fp_file, "w") as f:
+        f.write(fp)
+    _block(f"If {tid} is done and tsc + lint pass, run `tk review`. If not, continue or stop.")
+
+
+def _block(reason):
+    print(json.dumps({"decision": "block", "reason": reason}))
+
+
+# ------------------------------------------------------------------ main
+
+
+def main(argv):
+    global DRY
+    args, flags = [], set()
+    points = None
+    it = iter(argv)
+    for a in it:
+        if a in ("-n", "--dry-run"):
+            DRY = True
+        elif a in ("--fix", "--local", "--cloud"):
+            flags.add(a)
+        elif a == "--points":
+            v = next(it, None)
+            if v is None:
+                die("--points needs a number")
+            points = float(v) if "." in v else int(v)
+        elif a in ("-h", "--help"):
+            print(__doc__.strip())
+            return
+        else:
+            args.append(a)
+    if "--local" in flags and "--cloud" in flags:
+        die("pick one of --local / --cloud")
+    mode = "local" if "--local" in flags else "cloud" if "--cloud" in flags else None
+    if mode == "cloud" and os.environ.get("TK_CLOUD") != "1":
+        die("cloud is off. Set TK_CLOUD=1 in ~/.zshrc.local after the /remote-env test passes.")
+
+    if not args:
+        print(__doc__.strip())
+        sys.exit(2)
+    sub = args[0]
+    try:
+        if sub == "start" and len(args) == 2:
+            cmd_start(args[1], points, "--fix" in flags, mode)
+        elif sub == "review":
+            cmd_review()
+        elif sub == "watch" and len(args) == 2:
+            cmd_watch(args[1].upper())
+        elif sub == "hook-created":
+            cmd_hook_created()
+        elif sub == "hook-stop":
+            cmd_hook_stop()
+        else:
+            text = " ".join(args)
+            m = TICKET_RE.fullmatch(text.strip()) or URL_RE.search(text)
+            if m:
+                ref = m.group(1) if m.re is URL_RE else m.group(0)
+                cmd_start(ref, points, "--fix" in flags, mode)
+            else:
+                cmd_create(text)
+    except RuntimeError as e:
+        die(str(e))
+    except KeyboardInterrupt:
+        die("cancelled", 130)
+
+
+if __name__ == "__main__":
+    # Hooks must never break a session: swallow everything and stay silent.
+    if len(sys.argv) > 1 and sys.argv[1].startswith("hook-"):
+        try:
+            main(sys.argv[1:])
+        except BaseException:
+            pass
+        sys.exit(0)
+    main(sys.argv[1:])
