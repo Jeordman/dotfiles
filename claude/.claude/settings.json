@@ -1,6 +1,7 @@
 {
   "permissions": {
     "allow": [
+      "mcp__claude_ai_Vercel__list_deployments",
       "Bash(pwd)",
       "Bash(ls *)",
       "Bash(cat *)",
@@ -276,7 +277,7 @@
   "skipWorkflowUsageWarning": true,
   "theme": "dark",
   "verbose": false,
-  "remoteControlAtStartup": true,
+  "remoteControlAtStartup": false,
   "inputNeededNotifEnabled": false,
   "agentPushNotifEnabled": true,
   "skipAutoPermissionPrompt": true,

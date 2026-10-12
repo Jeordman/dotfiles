@@ -1,6 +1,15 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { age, classifyOpen, cleanTitle, parseTeam, releaseName } from '../hooks/track'
+import {
+  age,
+  classifyOpen,
+  cleanTitle,
+  keepMergeability,
+  parseTeam,
+  releaseName,
+  shellExport,
+  withTeamReview,
+} from '../hooks/track'
 import type { OpenPr } from '../hooks/track'
 
 const NOW = Date.UTC(2026, 9, 12, 12)
@@ -34,6 +43,56 @@ test('open PRs read as failing, conflicts, running, ready, with their checks', a
   expect(classifyOpen(pr({ mergeStateStatus: 'DIRTY' })).stage).toBe('conflicts')
   expect(classifyOpen(pr({ statusCheckRollup: [{ context: 'Vercel', state: 'PENDING' }] })).stage).toBe('building')
   expect(classifyOpen(pr({ isDraft: true, mergeStateStatus: 'DIRTY' })).stage).toBe('draft')
+  // GitHub says UNSTABLE while a check is still running
+  expect(
+    classifyOpen(
+      pr({
+        mergeStateStatus: 'UNSTABLE',
+        statusCheckRollup: [
+          { name: 'format-lint-build', status: 'COMPLETED', conclusion: 'SUCCESS' },
+          { name: 'Vercel Preview Comments', status: 'IN_PROGRESS', conclusion: null },
+        ],
+      }),
+    ),
+  ).toEqual({ stage: 'building', label: 'checks running', detail: '1/2 checks' })
+})
+
+test('a PR keeps its last mergeability while GitHub recomputes it', async () => {
+  const unknown = { number: 1, title: 't', url: 'u', branch: 'b', since: 'T1', ...classifyOpen(pr({ mergeStateStatus: 'UNKNOWN' })) }
+  const conflicted = { ...unknown, stage: 'conflicts' as const, label: 'merge conflicts' }
+  expect(unknown.label).toBe('checking mergeability')
+  expect(keepMergeability(unknown, conflicted)).toEqual({ ...unknown, stage: 'conflicts', label: 'merge conflicts' })
+  // A new push may have fixed it, and a first sighting has nothing to keep
+  expect(keepMergeability(unknown, { ...conflicted, since: 'T0' })).toEqual(unknown)
+  expect(keepMergeability(unknown, undefined)).toEqual(unknown)
+  expect(keepMergeability({ ...unknown, stage: 'ready', label: 'ready to merge' }, conflicted).stage).toBe('ready')
+})
+
+test('a teammate PR is ready once you or an approver approved its head commit', async () => {
+  const APPROVERS = { me: 'you', josh: 'Josh' }
+  const review = (login: string, state: string, oid: string) => ({ author: { login }, state, commit: { oid } })
+  const read = (reviews: ReturnType<typeof review>[], over: Partial<OpenPr> = {}) => {
+    const teamPr = pr({ headRefOid: 'head', reviews, ...over })
+    const row = { number: 1, title: 't', url: 'u', branch: 'b', since: 'T', ...classifyOpen(teamPr) }
+    const reviewed = withTeamReview(row, teamPr, APPROVERS)
+
+    return [reviewed.stage, reviewed.label, reviewed.approvedBy]
+  }
+
+  expect(read([])).toEqual(['review', 'needs review', undefined])
+  expect(read([review('someone', 'APPROVED', 'head')])).toEqual(['review', 'needs review', undefined])
+  expect(read([review('me', 'APPROVED', 'head')])).toEqual(['ready', 'ready to merge', 'you'])
+  expect(read([review('josh', 'APPROVED', 'head')])).toEqual(['ready', 'ready to merge', 'Josh'])
+  expect(read([review('me', 'APPROVED', 'old')])).toEqual(['review', 're-review: new commits', undefined])
+  expect(read([review('me', 'CHANGES_REQUESTED', 'head')])).toEqual(['blocked', 'changes requested', undefined])
+  // A later comment does not undo an approval
+  expect(read([review('me', 'APPROVED', 'head'), review('me', 'COMMENTED', 'head')])[0]).toBe('ready')
+  // A failing build, a conflict or a draft outranks the review
+  expect(read([], { mergeStateStatus: 'DIRTY' })[0]).toBe('conflicts')
+  expect(
+    read([], { statusCheckRollup: [{ name: 'format-lint-build', status: 'COMPLETED', conclusion: 'FAILURE' }] })[0],
+  ).toBe('failing')
+  expect(read([], { isDraft: true })[0]).toBe('draft')
 })
 
 test('titles, releases, ages and the team list read plainly', async () => {
@@ -47,7 +106,16 @@ test('titles, releases, ages and the team list read plainly', async () => {
   expect(parseTeam(undefined)).toEqual({})
 })
 
-test('a session opens the pane and tracks PRs to production', async ($, on) => {
+test('the team list is read from a shell file', async () => {
+  expect(shellExport('alias x=y\nexport PR_TRACKER_TEAM="dev-a:Ada,dev-b:Bo"\n', 'PR_TRACKER_TEAM')).toBe('dev-a:Ada,dev-b:Bo')
+  expect(shellExport("PR_TRACKER_TEAM='dev-a:Ada'", 'PR_TRACKER_TEAM')).toBe('dev-a:Ada')
+  expect(shellExport('export PR_TRACKER_TEAM=dev-a\nexport PR_TRACKER_TEAM=dev-b', 'PR_TRACKER_TEAM')).toBe('dev-b')
+  expect(shellExport('# PR_TRACKER_TEAM="dev-a"\nexport OTHER=1', 'PR_TRACKER_TEAM')).toBeUndefined()
+  expect(shellExport('', 'PR_TRACKER_TEAM')).toBeUndefined()
+  expect(shellExport('export PR_TRACKER_TEAM=a\nexport PR_TRACKER_APPROVERS=b', 'PR_TRACKER_APPROVERS')).toBe('b')
+})
+
+test('a session tracks PRs to production without opening the pane', async ($, on) => {
   mock.clock(on, { now: NOW })
   mock.env(on, { PR_TRACKER_TEAM: 'dev-a:Ada,dev-b:Bo,dev-c:Cy' })
 
@@ -67,7 +135,15 @@ test('a session opens the pane and tracks PRs to production', async ($, on) => {
   ]
   // The team's: everyone's PRs into release, the tracker keeps the team's
   const everyoneOpen = [
-    { ...pr({ number: 6, title: 'release <- Team open one' }), author: { login: 'dev-a' } },
+    {
+      ...pr({
+        number: 6,
+        title: 'release <- Team open one',
+        headRefOid: 'head6',
+        reviews: [{ author: { login: 'me-login' }, state: 'APPROVED', commit: { oid: 'head6' } }],
+      }),
+      author: { login: 'dev-a' },
+    },
     { ...pr({ number: 9, title: 'release <- Not a teammate' }), author: { login: 'app/dependabot' } },
   ]
   const everyoneMerged = [
@@ -105,6 +181,9 @@ test('a session opens the pane and tracks PRs to production', async ($, on) => {
           },
         }),
       )
+    }
+    if (args[0] === 'api' && args[1] === 'user') {
+      return ok('me-login\n')
     }
     if (args[0] === 'api') {
       const range = String(args[1]).split('/compare/')[1] ?? ''
@@ -176,13 +255,13 @@ test('a session opens the pane and tracks PRs to production', async ($, on) => {
 
   await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
   await isRefreshed
-  expect(opened).toEqual([{ id: 'prs', title: 'PRs', columns: 40 }])
+  expect(opened).toEqual([])
 
-  type Stored = { number: number; stage: string; label: string; detail: string; author?: string }
+  type Stored = { number: number; stage: string; label: string; detail: string; author?: string; approvedBy?: string }
   const shared = store.get('shared') as { rows: Stored[]; team: Stored[] }
-  expect(shared.team.map(row => [row.number, row.author, row.stage])).toEqual([
-    [6, 'dev-a', 'ready'],
-    [7, 'dev-b', 'release'],
+  expect(shared.team.map(row => [row.number, row.author, row.stage, row.approvedBy])).toEqual([
+    [6, 'dev-a', 'ready', 'you'],
+    [7, 'dev-b', 'release', undefined],
   ])
   expect(shared.rows.map(row => [row.number, row.stage, row.label, row.detail])).toEqual([
     [2, 'failing', 'format-lint-build failed', '1/1 failed'],

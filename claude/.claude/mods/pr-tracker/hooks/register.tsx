@@ -2,7 +2,19 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Hidden, Row, Snapshot, Stage, Tab } from '../types'
-import { URGENCY, age, classifyOpen, cleanTitle, daysAgo, parseTeam, releaseName } from './track'
+import {
+  URGENCY,
+  age,
+  classifyOpen,
+  cleanTitle,
+  daysAgo,
+  isMergeabilityUnknown,
+  keepMergeability,
+  parseTeam,
+  releaseName,
+  shellExport,
+  withTeamReview,
+} from './track'
 import type { OpenPr } from './track'
 
 const REPO = 'Unicity/new-shop'
@@ -20,16 +32,32 @@ const SHARED_FRESH_MS = POLL_MS - 30 * 1000
 // A missing or logged-out Vercel CLI is retried this often, not every poll
 const VERCEL_CLI_RETRY_MS = 60 * 60 * 1000
 const MAX_TOASTS = 3
+const OPEN_GAP_MS = 250
+// GitHub recomputes an unknown mergeability within seconds, so that is rechecked well before the next poll
+const RECHECK_MS = 30 * 1000
+const MAX_RECHECKS = 3
 const PANE = 'prs'
 // Bump when Snapshot changes shape, so a snapshot an older version saved is refetched
-const SNAPSHOT_VERSION = 2
+const SNAPSHOT_VERSION = 4
 // Docked right beside the fullscreen transcript, about this many columns wide
 const PANE_ARGS = { id: PANE, title: 'PRs', columns: 40 }
 
-// Coworkers on the Team tab, by GitHub login, in the order listed. Read at
-// session start from PR_TRACKER_TEAM (`login:Name,login:Name`), which lives in
-// ~/.zshrc.local so coworkers' handles stay out of this public repo
+// Coworkers on the Team tab, by GitHub login, in the order listed, and who besides
+// the person may approve their PRs. Read at session start from PR_TRACKER_TEAM and
+// PR_TRACKER_APPROVERS (`login:Name,login:Name`), which live in ~/.zshrc.local so
+// coworkers' handles stay out of this public repo
 let TEAM: Record<string, string> = {}
+let APPROVERS: Record<string, string> = {}
+
+// Claude may be launched by something that never sourced ~/.zshrc.local, so the file is read directly
+async function shellSetting($: EngineInterface, name: string, fromEnv: string | undefined): Promise<string | undefined> {
+  const home = await $.env.get('HOME')
+  if (fromEnv || !home) {
+    return fromEnv
+  }
+
+  return shellExport(await $.fs.read(`${home}/.zshrc.local`).catch(() => ''), name)
+}
 
 type MergedPr = {
   number: number
@@ -61,6 +89,7 @@ const snapshot = atom({ plugin: 'pr-tracker', key: 'snapshot' } as const, null)
 const tab = atom({ plugin: 'pr-tracker', key: 'tab' } as const, 'mine' as Tab)
 const hidden = atom({ plugin: 'pr-tracker', key: 'hidden' } as const, {} as Hidden)
 const showHidden = atom({ plugin: 'pr-tracker', key: 'showHidden' } as const, false)
+const fetching = atom({ plugin: 'pr-tracker', key: 'isRefreshing' } as const, false)
 
 // Your palette: herdr's status colors and the softened catppuccin accents in
 // nvim (colorschemes/catppuccin.lua), on herdr's neutral grays
@@ -80,7 +109,8 @@ const PALETTE = {
 const STYLE: Record<Stage, { color: string; dot: string }> = {
   failing: { color: PALETTE.red, dot: '●' },
   aborted: { color: PALETTE.red, dot: '●' },
-  conflicts: { color: PALETTE.attention, dot: '●' },
+  conflicts: { color: PALETTE.red, dot: '●' },
+  review: { color: PALETTE.attention, dot: '●' },
   building: { color: PALETTE.working, dot: '◌' },
   blocked: { color: PALETTE.overlay, dot: '○' },
   draft: { color: PALETTE.faint, dot: '○' },
@@ -92,13 +122,13 @@ const STYLE: Record<Stage, { color: string; dot: string }> = {
 }
 
 const SECTIONS: { title: string; stages: Stage[] }[] = [
-  { title: 'Open', stages: ['failing', 'conflicts', 'building', 'blocked', 'ready', 'draft'] },
+  { title: 'Open', stages: ['failing', 'conflicts', 'review', 'building', 'blocked', 'ready', 'draft'] },
   { title: 'In release', stages: ['release'] },
   { title: 'Shipping', stages: ['master', 'rolling', 'aborted'] },
   { title: 'Live today', stages: ['live'] },
 ]
 
-const OPEN_STAGES = new Set<Stage>(['failing', 'conflicts', 'building', 'blocked', 'ready', 'draft'])
+const OPEN_STAGES = new Set<Stage>(['failing', 'conflicts', 'review', 'building', 'blocked', 'ready', 'draft'])
 
 // Changes worth a toast when a PR moves into them
 const ANNOUNCE: Partial<Record<Stage, string>> = {
@@ -109,6 +139,11 @@ const ANNOUNCE: Partial<Record<Stage, string>> = {
 }
 
 let isRefreshing = false
+// A forced refresh asked for while another runs, done as soon as that one ends
+let isRefreshQueued = false
+let rechecks = 0
+// The person's GitHub login, looked up once
+let me = ''
 let vercelCliRetryAt = 0
 // GitHub deployment id → whether it succeeded, once it is final
 const githubDeployOk = new Map<string, boolean>()
@@ -337,7 +372,7 @@ async function fetchSnapshot($: EngineInterface, now: number): Promise<Snapshot>
     gh($, [
       'pr', 'list', '-R', REPO, '--base', 'release', '--state', 'open',
       '--search', `updated:>=${daysAgo(now, OPEN_DAYS)}`, '--limit', '100',
-      '--json', 'number,title,url,isDraft,mergeStateStatus,reviewDecision,headRefName,updatedAt,statusCheckRollup,author',
+      '--json', 'number,title,url,isDraft,mergeStateStatus,reviewDecision,headRefName,updatedAt,statusCheckRollup,author,headRefOid,reviews',
     ]),
     gh($, [
       'pr', 'list', '-R', REPO, '--base', 'release', '--state', 'merged',
@@ -372,14 +407,20 @@ async function fetchSnapshot($: EngineInterface, now: number): Promise<Snapshot>
     }
   }
 
-  const rows: Row[] = open.map(pr => ({
-    number: pr.number,
-    title: cleanTitle(pr.title),
-    url: pr.url,
-    branch: pr.headRefName,
-    since: pr.updatedAt ?? '',
-    ...classifyOpen(pr),
-  }))
+  const before = new Map([...(previous?.rows ?? []), ...(previous?.team ?? [])].map(row => [row.number, row]))
+  const rows: Row[] = open.map(pr =>
+    keepMergeability(
+      {
+        number: pr.number,
+        title: cleanTitle(pr.title),
+        url: pr.url,
+        branch: pr.headRefName,
+        since: pr.updatedAt ?? '',
+        ...classifyOpen(pr),
+      },
+      before.get(pr.number),
+    ),
+  )
 
   for (const pr of merged) {
     const shipped =
@@ -409,18 +450,30 @@ async function fetchSnapshot($: EngineInterface, now: number): Promise<Snapshot>
 
   rows.sort((a, b) => URGENCY.indexOf(a.stage) - URGENCY.indexOf(b.stage) || b.since.localeCompare(a.since))
 
+  if (!me) {
+    me = (await gh($, ['api', 'user', '--jq', '.login'])).trim()
+  }
   const isTeam = (login: string | undefined) => login !== undefined && TEAM[login] !== undefined
   const team: Row[] = (JSON.parse(teamOpenJson) as OpenPr[])
     .filter(pr => isTeam(pr.author?.login) && pr.headRefName !== 'master')
-    .map(pr => ({
-      number: pr.number,
-      title: cleanTitle(pr.title),
-      url: pr.url,
-      branch: pr.headRefName,
-      since: pr.updatedAt ?? '',
-      author: pr.author?.login,
-      ...classifyOpen(pr),
-    }))
+    .map(pr =>
+      withTeamReview(
+        keepMergeability(
+          {
+            number: pr.number,
+            title: cleanTitle(pr.title),
+            url: pr.url,
+            branch: pr.headRefName,
+            since: pr.updatedAt ?? '',
+            author: pr.author?.login,
+            ...classifyOpen(pr),
+          },
+          before.get(pr.number),
+        ),
+        pr,
+        { [me]: 'you', ...APPROVERS },
+      ),
+    )
   const teamMerged = (JSON.parse(teamMergedJson) as MergedPr[]).filter(
     pr => isTeam(pr.author?.login) && pr.headRefName !== 'master' && pr.mergeCommit,
   )
@@ -452,6 +505,7 @@ async function fetchSnapshot($: EngineInterface, now: number): Promise<Snapshot>
 
 async function refresh($: EngineInterface, isForced: boolean): Promise<void> {
   if (isRefreshing) {
+    isRefreshQueued = isRefreshQueued || isForced
     return
   }
   isRefreshing = true
@@ -467,6 +521,7 @@ async function refresh($: EngineInterface, isForced: boolean): Promise<void> {
     if (!isForced && isReusable) {
       next = shared
     } else {
+      await update($, fetching, () => true)
       try {
         next = await fetchSnapshot($, now)
         await $.store.set('shared', next)
@@ -499,6 +554,12 @@ async function refresh($: EngineInterface, isForced: boolean): Promise<void> {
 
     await update($, snapshot, () => next)
 
+    const isAnyUnknown = [...next.rows, ...(next.team ?? [])].some(isMergeabilityUnknown)
+    rechecks = isAnyUnknown ? rechecks + 1 : 0
+    if (isAnyUnknown && rechecks <= MAX_RECHECKS) {
+      $.clock.after(RECHECK_MS, () => void refresh($, true))
+    }
+
     // Forget hidden PRs that left the lists for good (closed, released)
     const listed = new Set([...next.rows, ...(next.team ?? [])].map(row => String(row.number)))
     const all = await read($, hidden)
@@ -509,6 +570,11 @@ async function refresh($: EngineInterface, isForced: boolean): Promise<void> {
     }
   } finally {
     isRefreshing = false
+    await update($, fetching, () => false)
+    if (isRefreshQueued) {
+      isRefreshQueued = false
+      void refresh($, true)
+    }
   }
 }
 
@@ -524,8 +590,12 @@ async function openPr($: EngineInterface, url: string): Promise<void> {
 }
 
 // A whole section at once, as browser tabs; capped so a slip opens a sane few
+// One `open` each, in turn: handed several at once, the browser opens them in no particular order
 async function openPrs($: EngineInterface, urls: string[]): Promise<void> {
-  await $.process.run(['open', ...urls.slice(0, 20)])
+  for (const url of urls.slice(0, 20)) {
+    await $.process.run(['open', url])
+    await $.clock.sleep(OPEN_GAP_MS)
+  }
 }
 
 // Still hidden while the PR looks as it did when hidden (see Hidden)
@@ -569,9 +639,8 @@ export const register: Register = on => {
     })
     // Earlier versions drew a status line; clear any left behind
     $.ui.status(undefined)
-    // Unasked, the engine seats it from 144 columns and waits below that
-    void $.ui.open(PANE_ARGS)
-    TEAM = parseTeam(await $.env.get('PR_TRACKER_TEAM'))
+    TEAM = parseTeam(await shellSetting($, 'PR_TRACKER_TEAM', await $.env.get('PR_TRACKER_TEAM')))
+    APPROVERS = parseTeam(await shellSetting($, 'PR_TRACKER_APPROVERS', await $.env.get('PR_TRACKER_APPROVERS')))
     const stored = ((await $.store.get('hidden')) as Hidden | undefined) ?? {}
     await update($, hidden, () => stored)
     void refresh($, false)
@@ -606,6 +675,7 @@ export const register: Register = on => {
     const shown = await read($, tab)
     const all = await read($, hidden)
     const isShowingHidden = await read($, showHidden)
+    const isFetching = await read($, fetching)
     const visible = (rows: Row[]) => rows.filter(row => isShowingHidden || !isHiddenRow(all, row))
     const countOf = (rows: Row[]) => rows.filter(row => !isHiddenRow(all, row)).length
     const mine = snap.rows
@@ -629,7 +699,11 @@ export const register: Register = on => {
       const style = isHidden ? { color: PALETTE.faint, dot: STYLE[row.stage].dot } : STYLE[row.stage]
       const number = `#${row.number}`
       const title = fit(row.title, width - number.length - 5)
-      const facts = fit([row.label, age(now, row.since), row.detail].filter(Boolean).join(' · '), width - 2)
+      const markText = row.approvedBy ? `✓ ${row.approvedBy} · ` : ''
+      const facts = fit(
+        [row.label, age(now, row.since), row.detail].filter(Boolean).join(' · '),
+        width - 2 - Array.from(markText).length,
+      )
       const [label = '', rest = ''] = facts.startsWith(row.label)
         ? [row.label, facts.slice(row.label.length)]
         : [facts, '']
@@ -658,6 +732,7 @@ export const register: Register = on => {
           </Box>
           <Box paddingLeft={2}>
             <Text>
+              {markText ? <Text color={isHidden ? PALETTE.faint : PALETTE.done}>{markText}</Text> : null}
               <Text color={style.color}>{label}</Text>
               <Text color={PALETTE.subtext}>{rest}</Text>
             </Text>
@@ -683,6 +758,7 @@ export const register: Register = on => {
             label={`Team ${countOf(team)}`}
             onPress={() => update($, tab, () => 'team' as Tab)}
           />
+          {isFetching && <Text color={PALETTE.faint}>refreshing…</Text>}
         </Box>
         {filled.length === 0 && (
           <Text color={PALETTE.subtext}>

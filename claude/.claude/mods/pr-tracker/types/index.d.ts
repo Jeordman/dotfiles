@@ -1,5 +1,5 @@
 // Where a PR stands on its way to production. Open PRs: draft, blocked,
-// building, conflicts, failing, ready. Merged into release: release, then
+// building, conflicts, failing, review (a teammate's, waiting on an approver), ready. Merged into release: release, then
 // master, rolling (canary at some %), aborted, and finally live (100%).
 export type Stage =
   | 'draft'
@@ -7,6 +7,7 @@ export type Stage =
   | 'building'
   | 'conflicts'
   | 'failing'
+  | 'review'
   | 'ready'
   | 'release'
   | 'master'
@@ -28,6 +29,8 @@ export type Row = {
   since: string
   // GitHub login, on the team's rows
   author?: string
+  // Who approved the head commit, on the team's open rows: "you", or an approver's name
+  approvedBy?: string
 }
 
 export type Tab = 'mine' | 'team'
@@ -50,6 +53,6 @@ export type Snapshot = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'pr-tracker': { snapshot: Snapshot | null; tab: Tab; hidden: Hidden; showHidden: boolean }
+    'pr-tracker': { snapshot: Snapshot | null; tab: Tab; hidden: Hidden; showHidden: boolean; isRefreshing: boolean }
   }
 }

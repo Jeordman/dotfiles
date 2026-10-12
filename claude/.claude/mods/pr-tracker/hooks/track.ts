@@ -1,6 +1,6 @@
 // Pure logic: how a PR's GitHub state reads, and how ages and releases read.
 // Everything that talks to gh, Vercel or the store lives in register.tsx.
-import type { Stage } from '../types'
+import type { Row, Stage } from '../types'
 
 type Check = {
   name?: string
@@ -8,6 +8,12 @@ type Check = {
   status?: string | null
   conclusion?: string | null
   state?: string | null
+}
+
+type Review = {
+  author?: { login: string }
+  state: string
+  commit?: { oid: string } | null
 }
 
 export type OpenPr = {
@@ -21,6 +27,8 @@ export type OpenPr = {
   author?: { login: string }
   updatedAt?: string
   statusCheckRollup: Check[]
+  headRefOid?: string
+  reviews?: Review[]
 }
 
 const FAILED = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE'])
@@ -36,6 +44,7 @@ export const URGENCY: Stage[] = [
   'failing',
   'aborted',
   'conflicts',
+  'review',
   'ready',
   'building',
   'blocked',
@@ -54,6 +63,15 @@ export function releaseName(message: string | undefined): string {
   const match = /release\s+(v?\d+(?:\.\d+)+)/i.exec(message ?? '')
 
   return match ? (match[1]!.startsWith('v') ? match[1]! : `v${match[1]}`) : ''
+}
+
+// The value of `export NAME="…"` in a shell file, quoted or not; the last one wins as in a shell
+export function shellExport(shellFile: string, name: string): string | undefined {
+  const pattern = new RegExp(`^\\s*(?:export\\s+)?${name}=(?:"([^"]*)"|'([^']*)'|(\\S*))`, 'gm')
+  const matches = [...shellFile.matchAll(pattern)]
+  const last = matches.at(-1)
+
+  return last ? (last[1] ?? last[2] ?? last[3]) : undefined
 }
 
 // The Team tab's people, from `login:Name,login:Name`; a pair without a name
@@ -96,7 +114,7 @@ export function classifyOpen(pr: OpenPr): { stage: Stage; label: string; detail:
   if (failed[0]) {
     return read('failing', `${failed[0].name ?? failed[0].context ?? 'build'} failed`)
   }
-  if (pr.mergeStateStatus === 'UNSTABLE') {
+  if (pr.mergeStateStatus === 'UNSTABLE' && !checks.some(isPending)) {
     return read('failing', 'checks failing')
   }
   if (pr.mergeStateStatus === 'DIRTY') {
@@ -115,7 +133,55 @@ export function classifyOpen(pr: OpenPr): { stage: Stage; label: string; detail:
     return read('ready', 'ready to merge')
   }
 
-  return read('building', 'checking mergeability')
+  return read('building', UNKNOWN_MERGEABILITY)
+}
+
+const UNKNOWN_MERGEABILITY = 'checking mergeability'
+const MERGEABILITY_STAGES = new Set<Stage>(['conflicts', 'blocked', 'ready'])
+
+export function isMergeabilityUnknown(row: Row): boolean {
+  return row.label === UNKNOWN_MERGEABILITY
+}
+
+// GitHub forgets every PR's mergeability when the base branch moves and recomputes it lazily;
+// until it answers again, a PR with no activity of its own keeps the answer it last had
+export function keepMergeability(row: Row, before: Row | undefined): Row {
+  if (!isMergeabilityUnknown(row) || !before || before.since !== row.since || !MERGEABILITY_STAGES.has(before.stage)) {
+    return row
+  }
+
+  return { ...row, stage: before.stage, label: before.label }
+}
+
+const OUTRANKS_REVIEW = new Set<Stage>(['draft', 'failing', 'conflicts'])
+
+// A teammate's PR is ready only once one of `approvers` (login → name) approved its head commit;
+// until then it waits on review, unless a draft, a failing build or a conflict comes first
+export function withTeamReview(row: Row, pr: OpenPr, approvers: Record<string, string>): Row {
+  const verdicts = Object.keys(approvers).map(login => {
+    const latest = (pr.reviews ?? [])
+      .filter(review => review.author?.login === login)
+      .filter(review => review.state === 'APPROVED' || review.state === 'CHANGES_REQUESTED')
+      .at(-1)
+    const isCurrent = !latest?.commit?.oid || !pr.headRefOid || latest.commit.oid === pr.headRefOid
+
+    return { login, state: latest?.state, isCurrent }
+  })
+
+  const approval = verdicts.find(verdict => verdict.state === 'APPROVED' && verdict.isCurrent)
+  if (approval) {
+    return { ...row, approvedBy: approvers[approval.login] }
+  }
+  if (OUTRANKS_REVIEW.has(row.stage)) {
+    return row
+  }
+  if (verdicts.some(verdict => verdict.state === 'CHANGES_REQUESTED' && verdict.isCurrent)) {
+    return { ...row, stage: 'blocked', label: 'changes requested' }
+  }
+
+  const isReviewedBefore = verdicts.some(verdict => verdict.state !== undefined)
+
+  return { ...row, stage: 'review', label: isReviewedBefore ? 're-review: new commits' : 'needs review' }
 }
 
 export function daysAgo(now: number, days: number): string {

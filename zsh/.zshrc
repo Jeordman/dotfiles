@@ -255,14 +255,9 @@ alias zhome='for dir in ~/*/; do zoxide add "$dir"; done'
 fpath=("${ZDOTDIR:-$HOME}/.config/zsh/functions" $fpath)
 autoload -Uz gtrm gtr
 
-# Name every Remote Control session after its git worktree.
-# All sessions run with remoteControlAtStartup, so each one appears in
-# claude.ai/code and the phone app. Left alone, that row gets titled from the
-# conversation (or `hostname-xxxx`), which is unusable when nine worktrees of the
-# same repo are connected at once. `--remote-control <name>` pins the row title
-# to the worktree AND marks it definitive, so Claude stops re-titling it from
-# messages later. CLAUDE_REMOTE_CONTROL_SESSION_NAME_PREFIX (set in chpwd below)
-# only seeds the *fallback* title, which is why setting it alone never stuck.
+# Remote Control is off (remoteControlAtStartup: false), so this wrapper no
+# longer injects `--remote-control <worktree>`. Pass that flag by hand to put a
+# single session on claude.ai/code + the phone app.
 claude() {
   local arg passthrough=0
   # high is the working default. It is pinned here rather than in settings.json
@@ -278,7 +273,7 @@ claude() {
   esac
   for arg in "$@"; do
     case "$arg" in
-      -p|--print|-n|--name|--name=*|--remote-control|--remote-control=*|--cloud|--cloud=*|--bg|--background|-w|--worktree|--worktree=*)
+      -p|--print|-n|--name|--name=*|--cloud|--cloud=*|--bg|--background|-w|--worktree|--worktree=*)
         passthrough=1 ;;
       --effort|--effort=*) effort=() ;;
     esac
@@ -288,11 +283,7 @@ claude() {
     return
   fi
 
-  # Worktree root, not $PWD — running claude from apps/shop should still say
-  # which worktree it is.
-  local name="${PWD:t}" root
-  root=$(command git rev-parse --show-toplevel 2>/dev/null) && name="${root:t}"
-  command claude --remote-control "$name" "${effort[@]}" "$@"
+  command claude "${effort[@]}" "$@"
 }
 
 # thefuck is gone on purpose. `thefuck --alias` spawns Python on every single
@@ -304,11 +295,7 @@ claude() {
 # run 'l' to list files after cd
 chpwd() {
   l
-  # Name auto-started Claude Code remote sessions after the current folder/worktree
-  export CLAUDE_REMOTE_CONTROL_SESSION_NAME_PREFIX="${PWD:t}"
 }
-# Seed the prefix for the shell's starting dir (chpwd only fires on cd)
-export CLAUDE_REMOTE_CONTROL_SESSION_NAME_PREFIX="${PWD:t}"
 
 # ctrl-x to edit command line
 autoload -Uz edit-command-line
