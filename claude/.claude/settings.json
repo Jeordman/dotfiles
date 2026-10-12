@@ -252,6 +252,7 @@
       }
     }
   },
+  "outputStyle": "Concise",
   "effortLevel": "low",
   "modelSettings": {
     "claude-opus-5": {
@@ -263,6 +264,9 @@
     "claude-opus-5-5": {
       "effortLevel": "low"
     }
+  },
+  "remote": {
+    "defaultEnvironmentId": "env_01ELkxQ224X5K9Wb2MeZvarz"
   },
   "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
@@ -305,9 +309,5 @@
       "**Org-specific CLIs**: herdr, probe, tuicr, gtr-clean (non-standard CLIs seen in shell history / project transcripts)"
     ]
   },
-  "voiceEnabled": true,
-  "remote": {
-    "defaultEnvironmentId": "env_01ELkxQ224X5K9Wb2MeZvarz"
-  },
-  "outputStyle": "Concise"
+  "voiceEnabled": true
 }

@@ -131,30 +131,33 @@ fi
 RC_NAME="$(basename "$WORK_DIR")"
 claude_cmd="claude --remote-control \"$RC_NAME\" --effort xhigh"
 if [ -n "$TICKET" ]; then
-  prompt="Use the ClickUp MCP to search for task $TICKET. Read the task description and create an implementation plan. When the work is done and tsc + lint pass, run: tk review"
+  prompt="Use the ClickUp MCP to search for task $TICKET. Read the task description and comments. If they link a Slack thread, read it; also search the shop-support and shop20collaboration-europe channels for $TICKET and read the thread where it was reported. Then create an implementation plan. When the work is done and tsc + lint pass, run: tk review"
   if [ -f "$WORK_DIR/.claude/skills/planning/SKILL.md" ]; then
     prompt="/planning $prompt"
   fi
   claude_cmd="claude --remote-control \"$RC_NAME\" --effort xhigh --permission-mode auto \"$prompt\""
 fi
 
+# tk's cloud mode sets TK_WATCH_CMD (e.g. `tk watch ECOM-1234`): the cloud session
+# does the implementing, so tab 1 runs the dispatcher/watcher instead of a second,
+# local Claude on the same ticket. The watcher hands that tab to claude-unattended
+# once the cloud has pushed.
+if [ -n "${TK_WATCH_CMD:-}" ]; then
+  claude_cmd="$TK_WATCH_CMD"
+  echo "Running in tab 1: $claude_cmd"
+else
+  echo "Starting Claude in tab 1..."
+fi
+
 # Run the commands. `herdr pane run` writes the command + Enter in one call, and
 # the pane already lives in WORK_DIR thanks to --cwd above.
-echo "Starting Claude in tab 1..."
 herdr pane run "$TAB1_PANE" "$claude_cmd" >/dev/null
 
 echo "Starting Neovim in tab 2..."
 herdr pane run "$TAB2_PANE" "nvim ." >/dev/null
 
 if [ -n "$TAB3_PANE" ]; then
-  # tk's cloud mode sets TK_TAB3_CMD (e.g. `tk watch ECOM-1234`) to dispatch the
-  # ticket and watch for the cloud session's commits from this tab.
-  if [ -n "${TK_TAB3_CMD:-}" ]; then
-    echo "Running in tab 3: $TK_TAB3_CMD"
-    herdr pane run "$TAB3_PANE" "$TK_TAB3_CMD" >/dev/null
-  else
-    echo "Shell ready in tab 3."
-  fi
+  echo "Shell ready in tab 3."
 fi
 
 CALLER_PANE="${HERDR_PANE_ID:-}"

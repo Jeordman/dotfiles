@@ -50,6 +50,7 @@ READY = "ready for code review"
 
 TICKET_RE = re.compile(r"\bECOM-\d+\b", re.I)
 URL_RE = re.compile(r"app\.clickup\.com/t/(?:\d+/)?([A-Za-z0-9-]+)")
+SLACK_LINK_RE = re.compile(r"https://[\w.-]*slack\.com/archives/[A-Z0-9]+/p\d+[^\s)>\]|\"']*")
 SPRINT_RE = re.compile(r"^Sprint (\d+) \((\d+)/(\d+)\s*-\s*(\d+)/(\d+)\)")
 
 CLOUD_BADGE = "☁️ "  # name prefix on a cloud Space; gtr-clean strips it too
@@ -220,12 +221,16 @@ def put_in_sprint(task, sprint):
         say(f"sprint: already in {sprint['name']}")
         return
     home = task["list"]
-    if status_rank(list_statuses(home["id"]), IN_DEV) is not None:
+    home_statuses = list_statuses(home["id"])
+    # A task added to a sprint keeps its home list's statuses, so "Add to Sprint"
+    # only works when that list can also reach "ready for code review" later.
+    # The Roadmap can; Bugs has "in development" but only "code review".
+    if status_rank(home_statuses, IN_DEV) is not None and status_rank(home_statuses, READY) is not None:
         # Same as the "Add to Sprint" button: stays in its home list too.
         api("POST", f"/list/{sprint['id']}/task/{task['id']}", write=True)
         say(f"sprint: added to {sprint['name']}")
     else:
-        # New Requests and friends have no "in development"; drag it over.
+        # New Requests, Bugs and friends lack those statuses; drag it over.
         api("PUT", f"/workspaces/{TEAM_ID}/tasks/{task['id']}/home_list/{sprint['id']}",
             {}, v3=True, write=True)
         say(f"sprint: moved from {home['name']} to {sprint['name']}")
@@ -469,8 +474,8 @@ def cmd_start(ref, points=None, force_fix=False, mode=None):
 
     env = dict(os.environ)
     if mode == "cloud":
-        # dev-init-herdr runs TK_TAB3_CMD in the workspace's shell tab.
-        env["TK_TAB3_CMD"] = f"tk watch {tid}"
+        # dev-init-herdr runs this in tab 1 instead of a local Claude.
+        env["TK_WATCH_CMD"] = f"tk watch {tid}"
         cmd = ["gtrc", branch, "--yes"]
     else:
         cmd = ["git", "gtr", "new", branch, "--yes"]
@@ -484,6 +489,8 @@ def cmd_start(ref, points=None, force_fix=False, mode=None):
 
 
 CREATE_MSG = """/create-ticket {text}
+
+If that is a Slack link, it is a report from #shop-support or #shop20collaboration-europe: read the whole thread with the Slack tools (follow-ups and clarifications are in the replies) and write the ticket from it, keeping the link in Sources. Reports often carry SKUs, market codes, portal customer/order links and screenshots; keep those details.
 
 Assign it to me (Jeordin Callister). In the confirmation, also include:
 - a story-points guess with a one-line reason
@@ -563,6 +570,17 @@ def ticket_context(task):
         for c in reversed(comments):
             who = (c.get("user") or {}).get("username", "someone")
             parts.append(f"- {who}: {c.get('comment_text', '').strip()}")
+    # Most tickets start as a Slack report and the details live in its thread.
+    # tk has no Slack access of its own, so it hands the cloud session the link
+    # (or where to search) and lets the session read it with its Slack tools.
+    links = sorted(set(SLACK_LINK_RE.findall("\n".join(parts))))
+    parts += ["", "## Where it was reported (Slack)"]
+    parts += [f"- {u}" for u in links] or ["- No Slack link on the ticket."]
+    parts += ["",
+              "Read that thread with your Slack tools if you have them; the replies hold "
+              "follow-ups and clarifications. With no link, search #shop-support (C02NF7VGG9G) "
+              f"and #shop20collaboration-europe (C088N861ABA) for {ticket_id(task)}. If you have "
+              "no Slack tools, say so under Assumptions and work from the ticket alone."]
     return "\n".join(parts)
 
 

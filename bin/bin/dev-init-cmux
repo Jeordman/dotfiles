@@ -115,7 +115,7 @@ fi
 RC_NAME="$(basename "$WORK_DIR")"
 claude_cmd="claude --remote-control \"$RC_NAME\" --effort xhigh"
 if [ -n "$TICKET" ]; then
-  prompt="Use the ClickUp MCP to search for task $TICKET. Read the task description and create an implementation plan. When the work is done and tsc + lint pass, run: tk review"
+  prompt="Use the ClickUp MCP to search for task $TICKET. Read the task description and comments. If they link a Slack thread, read it; also search the shop-support and shop20collaboration-europe channels for $TICKET and read the thread where it was reported. Then create an implementation plan. When the work is done and tsc + lint pass, run: tk review"
   if [ -f "$WORK_DIR/.claude/skills/planning/SKILL.md" ]; then
     prompt="/planning $prompt"
   fi

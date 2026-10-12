@@ -89,9 +89,13 @@ echo "  pushed and confirmed on origin"
 
 # The prompt is now the ONLY steering this run gets. Everything the session
 # cannot discover for itself has to be in here.
+READ_TICKET="Read the ticket from ClickUp first — the description AND the comments. On this team the real requirements are often in the comments rather than the description."
+if [ -n "${TK_TICKET_CONTEXT:-}" ] && [ -r "$TK_TICKET_CONTEXT" ]; then
+  READ_TICKET="The ticket's description and comments are at the end of this prompt. Work from those — do not look for ClickUp or its credentials. On this team the real requirements are often in the comments rather than the description."
+fi
 PROMPT="Implement ticket $TICKET on the current branch ($BRANCH).
 
-Read the ticket from ClickUp first — the description AND the comments. On this team the real requirements are often in the comments rather than the description.
+$READ_TICKET
 
 Follow the repo's own conventions: read CLAUDE.md and .claude/rules/ before writing code, and match the patterns already in the files you touch rather than introducing new ones. Prefer the smallest change that satisfies the ticket.
 
@@ -121,7 +125,10 @@ The ticket as of dispatch (description and comments, copied from ClickUp in case
 $(cat "$TK_TICKET_CONTEXT")"
 fi
 
-OUT=$(script -q /dev/null claude --permission-mode bypassPermissions --cloud "$PROMPT" 2>&1)
+# auto, not bypassPermissions: the cloud ignored bypass and fell back to
+# acceptEdits, which stalls on the first shell command with nobody to approve it
+# (seen 2026-10-09 on ECOM-7013).
+OUT=$(script -q /dev/null claude --permission-mode auto --cloud "$PROMPT" 2>&1)
 CLEAN=$(printf '%s' "$OUT" | sed -e 's/\x1b\[[0-9;?]*[a-zA-Z]//g' -e 's/\r/\n/g')
 URL=$(printf '%s' "$CLEAN" | grep -oE 'https://claude\.ai/code/session_[A-Za-z0-9]+' | head -1)
 
