@@ -1,0 +1,6 @@
+{
+  "name": "pr-tracker",
+  "version": "0.1.0",
+  "description": "Tracks your new-shop PRs from open, through release and master, to 100% rolled out",
+  "types": "./types/index.d.ts"
+}

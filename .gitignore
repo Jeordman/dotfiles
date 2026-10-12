@@ -19,3 +19,6 @@ docs/private/
 
 # Skills deleted through the desktop app land here; some carry third-party licenses.
 claude/.claude/skills/.trash/
+
+# Claude Code lays a mod's API types beside it on every load (regenerated).
+claude/.claude/mods/*/.claude-plugin/types/
