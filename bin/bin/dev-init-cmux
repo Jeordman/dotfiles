@@ -107,10 +107,18 @@ if [ -n "$TAB3" ]; then
 fi
 
 # Build Claude command
-claude_cmd="claude --effort xhigh"
+# When "remoteControlAtStartup" is true in settings.json, name the Remote Control
+# session after the worktree directory. The zsh claude() wrapper does the same
+# for hand-typed launches; passing it here keeps it right even when the pane
+# shell isn't zsh.
+rc_flag=""
+if grep -q '"remoteControlAtStartup": true' "$HOME/.claude/settings.json" 2>/dev/null; then
+  rc_flag="--remote-control \"$(basename "$WORK_DIR")\" "
+fi
+claude_cmd="claude ${rc_flag}--effort xhigh"
 if [ -n "$TICKET" ]; then
   prompt="Use the ClickUp MCP to read task $TICKET: description and comments. If they link a Slack thread, read it; also search the shop-support and shop20collaboration-europe channels for $TICKET and read the thread where it was reported. Check apps/*/docs/design-docs for the systems you touch and tell me if the ticket changes documented behavior. If the requirements are unclear, ask me before building; otherwise build it. When tsc + lint pass, run: tk review"
-  claude_cmd="claude --effort xhigh --permission-mode auto \"$prompt\""
+  claude_cmd="claude ${rc_flag}--effort xhigh --permission-mode auto \"$prompt\""
 fi
 
 # Send commands to each tab

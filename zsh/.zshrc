@@ -255,9 +255,12 @@ alias zhome='for dir in ~/*/; do zoxide add "$dir"; done'
 fpath=("${ZDOTDIR:-$HOME}/.config/zsh/functions" $fpath)
 autoload -Uz gtrm gtr
 
-# Remote Control is off (remoteControlAtStartup: false), so this wrapper no
-# longer injects `--remote-control <worktree>`. Pass that flag by hand to put a
-# single session on claude.ai/code + the phone app.
+# Remote Control is toggled by one line: "remoteControlAtStartup" in
+# claude/.claude/settings.json. When it's true, this wrapper also names the
+# session after its git worktree. Left alone, the claude.ai/code + phone row gets
+# titled from the conversation (or `hostname-xxxx`), which is unusable with
+# several worktrees of one repo connected. `--remote-control <name>` pins the
+# title AND marks it definitive, so Claude stops re-titling it later.
 claude() {
   local arg passthrough=0
   # high is the working default. It is pinned here rather than in settings.json
@@ -273,7 +276,7 @@ claude() {
   esac
   for arg in "$@"; do
     case "$arg" in
-      -p|--print|-n|--name|--name=*|--cloud|--cloud=*|--bg|--background|-w|--worktree|--worktree=*)
+      -p|--print|-n|--name|--name=*|--remote-control|--remote-control=*|--cloud|--cloud=*|--bg|--background|-w|--worktree|--worktree=*)
         passthrough=1 ;;
       --effort|--effort=*) effort=() ;;
     esac
@@ -283,7 +286,16 @@ claude() {
     return
   fi
 
-  command claude "${effort[@]}" "$@"
+  # Read on every launch, so flipping the setting needs no shell reload.
+  local -a rc=()
+  if command grep -q '"remoteControlAtStartup": true' ~/.claude/settings.json 2>/dev/null; then
+    # Worktree root, not $PWD — running claude from apps/shop should still say
+    # which worktree it is.
+    local name="${PWD:t}" root
+    root=$(command git rev-parse --show-toplevel 2>/dev/null) && name="${root:t}"
+    rc=(--remote-control "$name")
+  fi
+  command claude "${rc[@]}" "${effort[@]}" "$@"
 }
 
 # thefuck is gone on purpose. `thefuck --alias` spawns Python on every single
