@@ -8,6 +8,7 @@ import {
   classifyOpen,
   cleanTitle,
   daysAgo,
+  isSameDay,
   isMergeabilityUnknown,
   keepMergeability,
   parseTeam,
@@ -22,10 +23,10 @@ const VERCEL_SERVER = 'claude.ai Vercel'
 const VERCEL_TEAM = 'team_FuPVIgn0t46z9XzLhxVNbZlo'
 const VERCEL_SCOPE = 'unicity'
 const VERCEL_PROJECT = 'shop2'
+const PRODUCTION_DOMAIN = 'shop.unicity.com'
 const GITHUB_PRODUCTION = 'Production – shop2'
 const OPEN_DAYS = 14
 const MERGED_DAYS = 30
-const LIVE_SHOWN_MS = 24 * 60 * 60 * 1000
 const POLL_MS = 5 * 60 * 1000
 // Another session's snapshot younger than this is reused instead of refetched
 const SHARED_FRESH_MS = POLL_MS - 30 * 1000
@@ -193,6 +194,21 @@ async function vercelDeploys($: EngineInterface): Promise<Deploy[]> {
   return list
     .map(d => ({ id: String(d.id), sha: String(d.meta?.githubCommitSha ?? '') }))
     .filter(d => d.sha)
+}
+
+// A canary deploy has no domain aliases: Vercel points the production domain at a deploy once its
+// rollout completes, so this answers "at 100%" without the CLI (the connector 404s on rolling releases)
+async function isServingProduction($: EngineInterface, deployId: string): Promise<boolean> {
+  const result = await $.mcp.call(VERCEL_SERVER, 'list_deployment_aliases', { id: deployId, teamId: VERCEL_TEAM })
+  const text = result.content.find(block => block.type === 'text')?.text
+  if (result.isError || !text) {
+    throw new Error(text?.slice(0, 120) || 'no aliases returned')
+  }
+
+  const parsed = JSON.parse(text)
+  const aliases: { alias?: string }[] = parsed?.result?.aliases ?? parsed?.aliases ?? []
+
+  return aliases.some(alias => alias.alias === PRODUCTION_DOMAIN)
 }
 
 // Vercel reports each production deploy to GitHub too: the fallback source
@@ -391,17 +407,26 @@ async function fetchSnapshot($: EngineInterface, now: number): Promise<Snapshot>
   let rollout: Rollout | null = null
   let note = ''
   if (merged.some(pr => memory.liveAt[pr.number] === undefined)) {
+    let isFromVercel = true
     try {
       deploys = await vercelDeploys($)
     } catch (error) {
+      isFromVercel = false
       note = `Vercel connector: ${error instanceof Error ? error.message : String(error)}; using GitHub deploys`
       deploys = await githubDeploys($).catch(() => null)
     }
     if (deploys) {
       rollout = await rollingRelease($, now, deploys)
-      note = [note, rollout ? 'rollout % from the Vercel CLI' : 'exact rollout % needs the Vercel CLI']
-        .filter(Boolean)
-        .join(' · ')
+      let rolloutNote = rollout ? 'rollout % from the Vercel CLI' : 'exact rollout % needs the Vercel CLI'
+      const [latest] = deploys
+      if (!rollout && isFromVercel && latest) {
+        const isComplete = await isServingProduction($, latest.id).catch(() => false)
+        if (isComplete) {
+          rollout = { state: 'COMPLETE', liveSha: latest.sha }
+          rolloutNote = `latest deploy serves ${PRODUCTION_DOMAIN}`
+        }
+      }
+      note = [note, rolloutNote].filter(Boolean).join(' · ')
     } else {
       note = 'no deploy info: tracking stops at master'
     }
@@ -431,7 +456,7 @@ async function fetchSnapshot($: EngineInterface, now: number): Promise<Snapshot>
     if (shipped.stage === 'live') {
       const liveAt = memory.liveAt[pr.number] ?? (wasShipping.has(pr.number) ? now : 0)
       memory.liveAt[pr.number] = liveAt
-      if (now - liveAt > LIVE_SHOWN_MS) {
+      if (!isSameDay(liveAt, now)) {
         continue
       }
     }

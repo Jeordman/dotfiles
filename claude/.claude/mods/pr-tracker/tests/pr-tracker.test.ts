@@ -4,6 +4,7 @@ import {
   age,
   classifyOpen,
   cleanTitle,
+  isSameDay,
   keepMergeability,
   parseTeam,
   releaseName,
@@ -102,6 +103,8 @@ test('titles, releases, ages and the team list read plainly', async () => {
   expect(releaseName('master <- hotfix')).toBe('')
   expect(age(NOW, '2026-10-12T10:00:00Z')).toBe('2h')
   expect(age(NOW, '2026-10-09T12:00:00Z')).toBe('3d')
+  expect(isSameDay(new Date(2026, 9, 12, 0, 5).getTime(), new Date(2026, 9, 12, 23, 55).getTime())).toBe(true)
+  expect(isSameDay(new Date(2026, 9, 11, 23, 55).getTime(), new Date(2026, 9, 12, 0, 5).getTime())).toBe(false)
   expect(parseTeam(' dev-a:Ada , dev-b ,, ')).toEqual({ 'dev-a': 'Ada', 'dev-b': 'dev-b' })
   expect(parseTeam(undefined)).toEqual({})
 })

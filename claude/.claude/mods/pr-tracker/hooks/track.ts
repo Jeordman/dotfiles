@@ -188,6 +188,11 @@ export function daysAgo(now: number, days: number): string {
   return new Date(now - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
 
+// Same local calendar day: "Live today" means today, not the last 24 hours
+export function isSameDay(a: number, b: number): boolean {
+  return new Date(a).toDateString() === new Date(b).toDateString()
+}
+
 // "5m", "3h", "2d": how long since `iso`
 export function age(now: number, iso: string): string {
   const minutes = Math.max(0, Math.round((now - Date.parse(iso)) / 60_000))
