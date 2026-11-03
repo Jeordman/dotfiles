@@ -338,3 +338,11 @@ export PATH=$PATH:$HOME/.maestro/bin
 # direnv — loads/unloads per-directory env (.envrc) on cd. Keep near the end.
 # Guarded so shells don't error on machines where direnv isn't installed yet.
 command -v direnv >/dev/null && eval "$(direnv hook zsh)"
+
+# Claude desktop terminal: plain glyphs and shorter paths. Must stay after ~/.p10k.zsh is sourced.
+if [[ $TERM_PROGRAM == claude-desktop ]]; then
+  typeset -g POWERLEVEL9K_MODE=compatible
+  typeset -g POWERLEVEL9K_DIR_MAX_LENGTH=30
+  typeset -g POWERLEVEL9K_SHORTEN_STRATEGY=truncate_to_unique
+  typeset -g POWERLEVEL9K_VCS_BRANCH_ICON=  # ~/.p10k.zsh hardcodes a Nerd Font glyph here
+fi
