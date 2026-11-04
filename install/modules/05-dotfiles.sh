@@ -150,9 +150,15 @@ log_info "Creating symlinks with GNU Stow..."
 #
 # hammerspoon is macOS-only by nature: it is a macOS automation app, and its
 # init.lua taps Cmd+V for Ghostty image paste (see hammerspoon/.hammerspoon/init.lua).
+#
+# launchd holds custom LaunchAgents (label prefix com.jeordin.), loaded after
+# stow by load_launch_agents below. ~/Library/LaunchAgents must exist as a real
+# directory first: otherwise stow folds it into one symlink to the repo, and
+# every plist brew or an app writes there would land in dotfiles.
 STOW_PACKAGES=(bin btop claude git herdr nvim tuicr yazi zsh)
 if [[ "$OS_TYPE" == "macos" ]]; then
-    STOW_PACKAGES+=(ghostty codex lazygit hammerspoon)
+    STOW_PACKAGES+=(ghostty codex lazygit hammerspoon launchd)
+    [[ "$DRY_RUN" == "true" ]] || mkdir -p "$HOME/Library/LaunchAgents"
 fi
 
 if [[ "$DRY_RUN" == "true" ]]; then
@@ -273,6 +279,57 @@ refresh_herdr_skill() {
 }
 
 refresh_herdr_skill
+
+# Upstream skills (Matt Pocock's teach, grilling, ...) are installed by the
+# `skills` CLI, not committed, so they can update in place. The list lives in
+# bin/bin/skills-update; the daily launchd job below keeps them current.
+install_upstream_skills() {
+    local script="$DOTFILES_DIR/bin/bin/skills-update"
+
+    if ! command -v npx >/dev/null 2>&1 && [ ! -d "$HOME/.nvm/versions/node" ]; then
+        log_warning "node/npx not found — skipping upstream skills; later run: skills-update --install"
+        return 0
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[DRY RUN] Would run: skills-update --install"
+        return 0
+    fi
+
+    log_info "Installing upstream skills via the skills CLI..."
+    if "$script" --install; then
+        log_success "Upstream skills installed (see: npx skills ls -g)"
+    else
+        log_warning "skills-update --install failed — see ~/Library/Logs/com.jeordin.skills-update.log"
+    fi
+}
+
+install_upstream_skills
+
+# Load (or reload) every stowed LaunchAgent. Stowing only links the plist;
+# launchd ignores it until bootstrapped. bootout first so an edited plist is
+# picked up and bootstrap doesn't fail with "already loaded".
+load_launch_agents() {
+    [[ "$OS_TYPE" == "macos" && "$STOW_FAILED" != "true" ]] || return 0
+
+    local plist label
+    for plist in "$DOTFILES_DIR"/launchd/Library/LaunchAgents/*.plist; do
+        [ -e "$plist" ] || continue
+        label=$(basename "$plist" .plist)
+        if [[ "$DRY_RUN" == "true" ]]; then
+            log_info "[DRY RUN] Would load LaunchAgent $label"
+            continue
+        fi
+        launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
+        if launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/$label.plist" 2>/dev/null; then
+            log_success "LaunchAgent loaded: $label"
+        else
+            log_warning "Could not load $label — try: launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/$label.plist"
+        fi
+    done
+}
+
+load_launch_agents
 
 # Link the local herdr plugins. Stow cannot do this: a plugin is registered with
 # the herdr server by path, not linked into ~/.config, so a stowed copy would sit

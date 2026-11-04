@@ -22,3 +22,13 @@ claude/.claude/skills/.trash/
 
 # Claude Code lays a mod's API types beside it on every load (regenerated).
 claude/.claude/mods/*/.claude-plugin/types/
+
+# Upstream skills installed by the `skills` CLI (list + updater: bin/bin/skills-update).
+# The real copies live in ~/.agents/skills; these are the CLI's per-machine links.
+claude/.claude/skills/teach
+claude/.claude/skills/grill-me
+claude/.claude/skills/grill-with-docs
+claude/.claude/skills/grilling
+claude/.claude/skills/handoff
+claude/.claude/skills/research
+claude/.claude/skills/domain-modeling

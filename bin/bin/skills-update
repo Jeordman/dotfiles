@@ -1,0 +1,72 @@
+#!/bin/zsh
+# skills-update - install / update agent skills managed by the `skills` CLI.
+#
+#   skills-update            update every global CLI-managed skill (launchd runs this daily)
+#   skills-update --install  install the upstream skills listed below (install.sh runs this)
+#
+# These skills are NOT committed to the repo. The CLI keeps the real copy in
+# ~/.agents/skills/<name> (which Codex reads) and links ~/.claude/skills/<name>
+# to it. The source of truth for which upstream skills you use is UPSTREAM below;
+# `npx skills ls -g` shows what's installed, ~/.agents/.skill-lock.json where from.
+#
+# Scheduled by launchd/Library/LaunchAgents/com.jeordin.skills-update.plist.
+# Log: ~/Library/Logs/com.jeordin.skills-update.log
+
+UPSTREAM=(
+  "mattpocock/skills teach grill-me grill-with-docs grilling handoff research domain-modeling"
+)
+
+LOG="$HOME/Library/Logs/com.jeordin.skills-update.log"
+[[ "$OSTYPE" == darwin* ]] || LOG="${XDG_STATE_HOME:-$HOME/.local/state}/skills-update.log"
+mkdir -p "${LOG:h}"
+
+# launchd starts jobs with a bare PATH (/usr/bin:/bin:...), so npx isn't on it.
+# Mirror .zshrc: newest nvm node first, then Homebrew.
+nvm_bins=("$HOME"/.nvm/versions/node/*/bin(N))
+(( $#nvm_bins )) && PATH="$(printf '%s\n' "${nvm_bins[@]}" | sort -V | tail -1):$PATH"
+PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+export PATH DISABLE_TELEMETRY=1
+
+log() { print -r -- "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >>"$LOG"; }
+
+# The CLI computes its Claude link relative to ~/.claude/skills, but that dir is
+# itself a symlink into ~/dotfiles, so a freshly created link can dangle
+# (../../.agents/... lands in dotfiles/claude/). Repair any link that doesn't
+# resolve. Existing good links are left alone, and the CLI leaves them alone too.
+relink() {
+  local entry name
+  for entry in "${UPSTREAM[@]}"; do
+    for name in ${${=entry}[2,-1]}; do
+      [[ -d "$HOME/.agents/skills/$name" ]] || continue
+      if [[ ! -f "$HOME/.claude/skills/$name/SKILL.md" ]]; then
+        ln -sfn "$HOME/.agents/skills/$name" "$HOME/.claude/skills/$name"
+        log "relinked ~/.claude/skills/$name"
+      fi
+    done
+  done
+}
+
+if ! command -v npx >/dev/null; then
+  log "ERROR: npx not found on PATH ($PATH)"
+  exit 1
+fi
+
+rc=0
+if [[ "$1" == "--install" ]]; then
+  for entry in "${UPSTREAM[@]}"; do
+    words=(${=entry})
+    args=()
+    for name in ${words[2,-1]}; do args+=(-s "$name"); done
+    log "installing from ${words[1]}: ${words[2,-1]}"
+    npx -y skills@latest add "${words[1]}" "${args[@]}" -g -a claude-code -a codex -y >>"$LOG" 2>&1 || rc=$?
+  done
+else
+  log "updating global skills"
+  npx -y skills@latest update -g -y >>"$LOG" 2>&1 || rc=$?
+fi
+relink
+log "done (exit $rc)"
+
+# Keep the log bounded.
+tail -n 2000 "$LOG" >"$LOG.tmp" && mv "$LOG.tmp" "$LOG"
+exit $rc
