@@ -32,3 +32,7 @@ claude/.claude/skills/grilling
 claude/.claude/skills/handoff
 claude/.claude/skills/research
 claude/.claude/skills/domain-modeling
+
+# Herdr.app regenerates these type stubs into every mod folder on start.
+herdr-app/**/gpui-kit.d.ts
+herdr-app/**/jsconfig.json

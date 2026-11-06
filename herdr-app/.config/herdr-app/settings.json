@@ -1,0 +1,11 @@
+{
+  "zoom": 1.2,
+  "sounds": {
+    "enabled": true
+  },
+  "font": "Hack Nerd Font",
+  "font_ligatures": false,
+  "minimum_contrast": 1,
+  "theme": "conductor",
+  "ui_font": "Hack Nerd Font"
+}
